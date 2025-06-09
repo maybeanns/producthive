@@ -1,0 +1,27 @@
+/* src/static/style.css */
+
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+}
+
+input[type="text"] {
+    width: 300px;
+    padding: 5px;
+    margin-right: 10px;
+}
+
+button {
+    margin: 5px;
+    padding: 10px;
+}
+
+#debateHistory {
+    margin-top: 20px;
+}
+
+#debateHistory div {
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    padding: 10px;
+}

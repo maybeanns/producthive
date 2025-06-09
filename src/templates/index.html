@@ -1,0 +1,24 @@
+<!-- src/templates/index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Product Team Debate</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <h1>Product Team Debate Visualizer</h1>
+
+    <input type="text" id="topicInput" placeholder="Enter debate topic" />
+    <button onclick="startDebate()">Start Debate</button>
+    <button onclick="continueDebate()">Continue Debate</button>
+    <button onclick="revisitTopic()">Revisit Topic</button>
+
+    <h2>Debate History</h2>
+    <div id="debateHistory"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

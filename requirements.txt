@@ -1,0 +1,9 @@
+# Dev environment
+pip
+autopep8
+google-cloud-aiplatform 
+langchain 
+langchain-google-vertexai
+
+# App
+flask
