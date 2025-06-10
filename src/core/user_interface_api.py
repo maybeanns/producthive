@@ -8,6 +8,16 @@ from core.agent_registry import get_active_agents
 agents = [UXDesignAgent()]
 orchestrator = DebateOrchestrator(agents)
 
+@api_blueprint.route('/save_debate', methods=['POST'])
+def save_debate():
+    session_id = asyncio.run(orchestrator.save_debate())
+    return jsonify({"session_id": session_id})
+
+@api_blueprint.route('/load_debate/<session_id>', methods=['GET'])
+def load_debate(session_id):
+    data = asyncio.run(orchestrator.load_debate(session_id))
+    return jsonify(data)
+
 @api_blueprint.route('/start_debate', methods=['POST'])
 def start_debate():
     data = request.json

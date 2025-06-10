@@ -3,6 +3,7 @@
 import asyncio
 from typing import List, Dict
 from agents.base_agent import BaseAgent
+from core.debate_history_store import DebateHistoryStore
 
 class DebateOrchestrator:
     def __init__(self, agents: List[BaseAgent]):
@@ -10,12 +11,29 @@ class DebateOrchestrator:
         self.current_topic = None
         self.debate_history = []
         self.context = {}
+        self.history_store = DebateHistoryStore()
 
     async def start_debate(self, topic: str) -> dict:
         self.current_topic = topic
         self.debate_history = []
         self.context = {"previous_arguments": []}
         return await self._run_round()
+    
+    async def save_debate(self) -> str:
+        return self.history_store.save_debate(self.current_topic, self.debate_history)
+
+    async def load_debate(self, session_id: str) -> dict:
+        data = self.history_store.load_debate(session_id)
+        if data:
+            self.current_topic = data["topic"]
+            self.debate_history = data["history"]
+            self.context = {"previous_arguments": []}
+            for round_data in self.debate_history:
+                for argument in round_data["results"]:
+                    self.context["previous_arguments"].append(argument)
+            return data
+        else:
+            return {"error": "Session not found"}
 
     async def continue_debate(self) -> dict:
         return await self._run_round()

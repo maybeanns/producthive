@@ -27,6 +27,17 @@ async function revisitTopic() {
     renderDebateHistory([data]);
 }
 
+async function saveDebate() {
+    const res = await fetch(`${apiBase}/save_debate`, { method: 'POST' });
+    const data = await res.json();
+    alert(`Debate saved! Session ID: ${data.session_id}`);
+}
+
+async function generatePRD() {
+    // Placeholder for now
+    alert("Generate PRD clicked! (Will implement this next)");
+}
+
 async function getDebateHistory() {
     const res = await fetch(`${apiBase}/get_debate_history`);
     const data = await res.json();
@@ -39,7 +50,7 @@ function renderDebateHistory(history) {
 
     history.forEach(round => {
         const roundDiv = document.createElement('div');
-        roundDiv.innerHTML = `<h3>Round ${round.round}</h3>`;
+        roundDiv.innerHTML = `<h5>Round ${round.round}</h5>`;
         round.results.forEach(arg => {
             const agentDiv = document.createElement('div');
             agentDiv.innerHTML = `

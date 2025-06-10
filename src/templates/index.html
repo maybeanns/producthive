@@ -1,24 +1,51 @@
-<!-- src/templates/index.html -->
+<!-- src/templates/index.html
+ml> -->
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Product Team Debate</title>
+    <title>ProductHive - AI Product Team</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-    <h1>Product Team Debate Visualizer</h1>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#" style="font-family: 'Poppins', sans-serif; font-size: 24px;">ProductHive 🐝</a>
+        </div>
+    </nav>
 
-    <input type="text" id="topicInput" placeholder="Enter debate topic" />
-    <button onclick="startDebate()">Start Debate</button>
-    <button onclick="continueDebate()">Continue Debate</button>
-    <button onclick="revisitTopic()">Revisit Topic</button>
+    <div class="container">
+        <!-- User Interaction Panel -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h4 class="card-title mb-3">Start a Product Debate</h4>
+                <div class="input-group mb-3">
+                    <input type="text" id="topicInput" class="form-control" placeholder="Enter debate topic" />
+                    <button class="btn btn-primary" onclick="startDebate()">Start Debate</button>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-secondary" onclick="continueDebate()">Continue Debate</button>
+                    <button class="btn btn-warning" onclick="revisitTopic()">Revisit Topic</button>
+                    <button class="btn btn-success" onclick="generatePRD()">Generate PRD</button>
+                    <button class="btn btn-info" onclick="saveDebate()">Save Debate</button>
+                </div>
+            </div>
+        </div>
 
-    <h2>Debate History</h2>
-    <div id="debateHistory"></div>
+        <!-- Debate History -->
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title mb-3">Debate History</h4>
+                <div id="debateHistory"></div>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/app.js"></script>
 </body>
 </html>
+
