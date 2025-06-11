@@ -5,7 +5,7 @@ import uuid
 
 class DebateHistoryStore:
     def __init__(self):
-        self.db = firestore.Client()
+        self.db = firestore.Client(project="producthive-462420")
         self.collection = self.db.collection("debate_sessions")
 
     def save_debate(self, topic, debate_history):

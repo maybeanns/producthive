@@ -1,5 +1,4 @@
-<!-- src/templates/index.html
-ml> -->
+<!-- src/templates/index.htmlml> -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -32,6 +31,11 @@ ml> -->
                     <button class="btn btn-warning" onclick="revisitTopic()">Revisit Topic</button>
                     <button class="btn btn-success" onclick="generatePRD()">Generate PRD</button>
                     <button class="btn btn-info" onclick="saveDebate()">Save Debate</button>
+                </div>
+                <div class="input-group mb-3 mt-3">
+                    <input type="text" id="agentNameInput" class="form-control" placeholder="Enter agent name (exact)" />
+                    <input type="text" id="agentQuestionInput" class="form-control" placeholder="Enter your question" />
+                    <button class="btn btn-outline-primary" onclick="askAgent()">Ask Agent</button>
                 </div>
             </div>
         </div>

@@ -13,6 +13,27 @@ async function startDebate() {
     renderDebateHistory([data]);
 }
 
+async function generatePRD() {
+    window.open(`${apiBase}/generate_prd`, '_blank');
+}
+
+async function askAgent() {
+    const agentName = document.getElementById('agentNameInput').value;
+    const question = document.getElementById('agentQuestionInput').value;
+
+    const res = await fetch(`${apiBase}/ask_agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            agent_name: agentName,
+            question: question
+        })
+    });
+
+    const data = await res.json();
+    alert(`Agent Response:\n${data.agent} — Position: ${data.position}\nReasoning:\n${data.reasoning.join('\n')}`);
+}
+
 async function continueDebate() {
     const res = await fetch(`${apiBase}/continue_debate`, { method: 'POST' });
     const data = await res.json();

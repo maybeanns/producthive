@@ -1,5 +1,5 @@
 # src/agents/db_agent.py
-
+import vertexai
 from agents.base_agent import BaseAgent
 from langchain_google_vertexai import VertexAI
 from langchain.prompts import PromptTemplate
@@ -7,7 +7,8 @@ from langchain.prompts import PromptTemplate
 class DatabaseAgent(BaseAgent):
     def __init__(self):
         super().__init__(name="Database Agent")
-        self.llm = VertexAI(model_name="gemini-1.5-pro")
+        vertexai.init(project="producthive-462420", location="us-central1")
+        self.llm = VertexAI(model_name="gemini-2.0-flash-lite-001")
 
         self.prompt_template = PromptTemplate.from_template("""
 You are an expert Database Architect with expertise in:

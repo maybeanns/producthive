@@ -12,6 +12,16 @@ class DebateOrchestrator:
         self.debate_history = []
         self.context = {}
         self.history_store = DebateHistoryStore()
+        self.prd_state = {
+            "overview": "",
+            "goals": [],
+            "functional_requirements": [],
+            "non_functional_requirements": [],
+            "risks": [],
+            "user_stories": [],
+            "architecture_notes": [],
+            "kanban_tasks": []
+        }
 
     async def start_debate(self, topic: str) -> dict:
         self.current_topic = topic
