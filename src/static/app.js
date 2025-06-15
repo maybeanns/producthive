@@ -140,63 +140,138 @@ async function continueDebate() {
 }
 
 function getAgentText(msg) {
-  if (typeof msg === 'string') return formatAgentText(msg);
-  if (msg && msg.content && Array.isArray(msg.content.parts)) {
-    return msg.content.parts
+  // Extract the actual text content from the complex JSON structure
+  let rawText = '';
+  
+  if (typeof msg === 'string') {
+    rawText = msg;
+  } else if (msg && msg.argument) {
+    // Parse the JSON string in the argument field
+    try {
+      const parsed = JSON.parse(msg.argument);
+      if (parsed.text) {
+        const textData = JSON.parse(parsed.text);
+        if (textData.content && textData.content.parts && textData.content.parts[0]) {
+          rawText = textData.content.parts[0].text;
+        }
+      }
+    } catch (e) {
+      rawText = JSON.stringify(msg);
+    }
+  } else if (msg && msg.content && Array.isArray(msg.content.parts)) {
+    rawText = msg.content.parts
       .filter(part => 'text' in part)
-      .map(part => formatAgentText(part.text))
-      .join("<hr>");
+      .map(part => part.text)
+      .join(' ');
+  } else {
+    rawText = JSON.stringify(msg);
   }
-  return formatAgentText(JSON.stringify(msg));
+
+  return formatAgentText(rawText);
 }
 
-// Improved Markdown-like formatter
+function getAgentText(msg) {
+  let rawText = '';
+  
+  if (typeof msg === 'string') {
+    rawText = msg;
+  } else if (msg && msg.text) {  // Changed from msg.argument to msg.text
+    let textStr = msg.text;
+    
+    try {
+      // The text field contains a JSON-like string, parse it
+      const parsed = JSON.parse(textStr);
+      
+      if (parsed.content && parsed.content.parts && parsed.content.parts[0] && parsed.content.parts[0].text) {
+        rawText = parsed.content.parts[0].text;
+      }
+    } catch (e) {
+      // Fallback: use regex to extract the actual text content
+      const textMatch = textStr.match(/'text':\s*['"](.*?)['"](?:\s*\})/);
+      if (textMatch && textMatch[1]) {
+        rawText = textMatch[1];
+      } else {
+        // Try another pattern for escaped quotes
+        const textMatch2 = textStr.match(/'text':\s*['"]((?:[^'"\\]|\\.)*)['"][^}]*\}/);
+        if (textMatch2 && textMatch2[1]) {
+          rawText = textMatch2[1];
+        }
+      }
+    }
+  } else if (msg && msg.argument) {  // Keep this as fallback
+    let argumentStr = msg.argument;
+    try {
+      const parsed = JSON.parse(argumentStr);
+      if (parsed.text) {
+        const innerParsed = JSON.parse(parsed.text);
+        if (innerParsed.content && innerParsed.content.parts && innerParsed.content.parts[0]) {
+          rawText = innerParsed.content.parts[0].text;
+        }
+      }
+    } catch (e) {
+      const textMatch = argumentStr.match(/"text":\s*"([^"]*(?:\\.[^"]*)*)"/);
+      if (textMatch && textMatch[1]) {
+        rawText = textMatch[1];
+      }
+    }
+  }
+  
+  // If still no content, return empty (don't show debug for empty entries)
+  if (!rawText || rawText.length < 10) {
+    return "";
+  }
+  
+  return formatAgentText(rawText);
+}
+
 function formatAgentText(text) {
-  if (!text) return "";
+  if (!text || text.length < 5) {
+    return "";
+  }
 
-  // Escape HTML special characters for safety
-  text = text.replace(/[&<>"']/g, function(m) {
-    return ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    })[m];
-  });
+  // Clean up escaped characters
+  text = text.replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\'/g, "'")
+            .replace(/\\\\/g, '\\')
+            .replace(/\\t/g, ' ');
 
-  // Convert "**bold**" to <strong>
+  // Remove JSON metadata from the end
+  text = text.replace(/('\}],\s*'role':|"\}],\s*"role":).*$/s, '');
+  text = text.replace(/('\},\s*'usage_metadata':|"\},\s*"usage_metadata":).*$/s, '');
+
+  // Clean up the text
+  text = text.trim();
+
+  // Format the agent type at the beginning
+  text = text.replace(/^(As an?|I'm a|Being a)\s+(UX Designer|Data Scientist|Product Manager|Security Expert|Software Engineer|Business Analyst|Database Expert|Backend Developer|Frontend Developer)/gi, 
+                     '<strong>$2 Perspective:</strong><br><br>');
+
+  // Format section headers
+  text = text.replace(/(Opening Argument|My (argument|concerns?|perspective)|Here's my|From a [A-Z][a-z]+( [A-Z][a-z]+)* perspective):\s*/gi, 
+                     '<br><br><strong>$1:</strong><br>');
+
+  text = text.replace(/(Recommendations?|Conclusions?|Key Points?|In summary|In short):\s*/gi, 
+                     '<br><br><strong>$1:</strong><br>');
+
+  // Format numbered points and bullet points
+  text = text.replace(/(\d+\.\s+\*\*[^*]+\*\*)/g, '<br><br><strong>$1</strong>');
+  text = text.replace(/^\*\s+\*\*([^*]+)\*\*/gm, '<br><br><strong>• $1:</strong>');
+  
+  // Convert regular bullet points
+  text = text.replace(/\n\s*[\*\-\•]\s+(.+)/g, '<br>• $1');
+
+  // Format bold/italic
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  // Convert "*italic*" to <em>
-  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  text = text.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
 
-  // Convert bullet points and numbered lists to <ul>/<ol>
-  // Numbered lists
-  text = text.replace(/(?:^|\n)(\d+)\. (.+)/g, function(_, num, item) {
-    return `<li>${item}</li>`;
-  });
-  // Bullet lists
-  text = text.replace(/(?:^|\n)[\*\-] (.+)/g, function(_, item) {
-    return `<li>${item}</li>`;
-  });
-
-  // Group consecutive <li> into <ul>
-  text = text.replace(/(<li>[\s\S]+?<\/li>)/g, m =>
-    `<ul>${m.replace(/(<li>[\s\S]+?<\/li>)/g, '$1')}</ul>`
-  );
-
-  // Section titles (e.g. "section_name:") to bold with spacing
-  text = text.replace(/([a-zA-Z0-9_\\]+):\n/g, '<br><strong>$1:</strong><br>');
-  // Analysis/Recommendations with bold
-  text = text.replace(/(Analysis|Recommendations|Questions to Answer):/g, '<strong>$1:</strong>');
-
-  // Turn double newlines into paragraph breaks
+  // Handle line breaks
   text = text.replace(/\n{2,}/g, '<br><br>');
-  // Turn single newlines into <br> but not after <ul>/<li>
-  text = text.replace(/([^\n])\n([^\n])/g, '$1<br>$2');
+  text = text.replace(/\n/g, '<br>');
 
-  // Remove empty <ul></ul>
-  text = text.replace(/<ul>\s*<\/ul>/g, '');
+  // Clean up excessive breaks
+  text = text.replace(/(<br>\s*){3,}/g, '<br><br>');
+  text = text.replace(/^(<br>\s*)+|(<br>\s*)+$/g, '');
 
   return text;
 }
