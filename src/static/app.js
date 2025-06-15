@@ -12,9 +12,13 @@ async function startDebate() {
   const res = await fetch("/api/start_debate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic: input }) // <-- FIXED KEY
+    body: JSON.stringify({ topic: input })
   });
   const data = await res.json();
+  if (data.error) {
+    alert("Error: " + data.error);
+    return;
+  }
   renderDebate(data.history);
   renderPRD(data.prd_state);
   document.getElementById("userInput").value = '';

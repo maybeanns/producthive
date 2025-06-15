@@ -1,20 +1,69 @@
+from agents.ux_agent_adk import ux_agent
+from agents.db_agent_adk import db_agent
+from agents.backend_agent_adk import backend_agent
+from agents.frontend_agent_adk import frontend_agent
+from agents.business_agent_adk import business_agent
+# from vertexai.preview.text_analysis import TextAnalyzer
 
 from vertexai.preview.reasoning_engines import AdkApp
 from agents.architect_with_subagents import architect
 from shared.prd_state import PRD_TEMPLATE, is_prd_stable
 from tools.architect_toolkit import update_prd_from_agent
 from tools.handle_mentions import extract_mention
+from google.adk.models.llm_request import LlmRequest
+from google.genai import types
 
 class DebateOrchestratorADK:
     def __init__(self):
         self.app = AdkApp(agent=architect)
-        self.context = {}
+        self.agents = [ux_agent, db_agent, backend_agent, frontend_agent, business_agent]  # or however you import/instantiate
+        self.context = {"history": [], "prd_state": {}}
+        self.current_topic = ""
         self.debate_history = []
         self.prd_state = PRD_TEMPLATE.copy()
         self.topic = None
-        self.current_topic = None
+        
 
+    async def start_debate(self, topic: str = ""):
+        self.current_topic = topic
+        self.debate_history = []
+        self.context = {"history": [], "prd_state": {}}
+
+        for agent in self.agents:
+            try:
+                # Build the Content object for the prompt
+                prompt = f"Debate topic: {topic}\nAs {agent.name}, provide your opening argument."
+                content = types.Content(role="user", parts=[prompt])
+
+                # Build the LlmRequest
+                request = LlmRequest(
+                    model=getattr(agent, "model", None),  # Use the agent's model if available
+                    contents=[content]
+                )
+
+                # Run the agent and gather the response
+                response_text = ""
+                async for chunk in agent.run_async(request):
+                    # If chunk has .text, use it, else fallback to str(chunk)
+                    response_text += getattr(chunk, "text", str(chunk))
+
+                argument = {"agent": agent.name, "text": response_text}
+            except Exception as e:
+                argument = {"agent": agent.name, "text": f"Error: {str(e)}"}
+
+            self.debate_history.append({
+                "agent": agent.name,
+                "argument": argument,
+            })
+            self.context["history"].append(argument)
+
+        return {
+            "history": self.debate_history,
+            "prd_state": self.context["prd_state"],
+            "done": False
+        }
     def reset(self, topic: str):
+
         self.topic = topic
         self.current_topic = topic
         self.context = {

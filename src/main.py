@@ -7,12 +7,10 @@ from flask_cors import CORS
 from core.user_interface_api import api_blueprint
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-CORS(app)  # Optional: Enable CORS for local frontend JS
+CORS(app)
 
-# Register API blueprint (no prefix if routes already start with /api)
-app.register_blueprint(api_blueprint)
+app.register_blueprint(api_blueprint, url_prefix="/api")
 
-# Home route
 @app.route("/")
 def index():
     return render_template("index.html")
