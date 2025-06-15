@@ -1,27 +1,54 @@
 /* src/static/style.css */
 
 body {
-    font-family: Arial, sans-serif;
-    padding: 20px;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #8a7f7f;
 }
 
-input[type="text"] {
-    width: 300px;
-    padding: 5px;
-    margin-right: 10px;
+nav h1 {
+  font-size: 1.8rem;
+  font-weight: bold;
 }
 
-button {
-    margin: 5px;
-    padding: 10px;
+#userInput {
+  resize: vertical;
 }
 
 #debateHistory {
-    margin-top: 20px;
+  flex: 1;
+  background: var(--message-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
-#debateHistory div {
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    padding: 10px;
+#debateHistory pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+#prdView {
+  font-size: 0.9rem;
+  background-color: #fcfcfc;
+}
+.agent-msg ul {
+  margin-bottom: 0.5rem;
+  margin-top: 0.2rem;
+  padding-left: 1.5rem;
+}
+.agent-msg li {
+  margin-bottom: 0.2rem;
+}
+.agent-msg strong {
+  color: #f2cb72;
+}
+.agent-msg em {
+  color: #91d2fa;
+}
+.agent-msg br {
+  line-height: 2;
 }

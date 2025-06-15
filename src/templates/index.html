@@ -1,55 +1,201 @@
-<!-- src/templates/index.htmlml> -->
-
+<!-- src/templates/index.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ProductHive - AI Product Team</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/style.css" />
+  <meta charset="UTF-8">
+  <title>ProductHive</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    window.onload = () => {
+      if (typeof loadSessionList === 'function') {
+        loadSessionList();
+      }
+    };
+  </script>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+    }
+    .chat-history {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding: 1rem;
+      background-color: #1e1e1e;
+      border-radius: 0.5rem;
+    }
+    .chat-input-container {
+      padding: 0.5rem 0 0 0;
+      border-top: 1px solid #333;
+    }
+    .chat-input-wrapper {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .chat-textarea {
+      flex: 1;
+      height: 60px;
+      resize: none;
+      background-color: #2a2a2a;
+      color: #f0f0f0;
+      border: 1px solid #444;
+      border-radius: 0.375rem;
+      padding: 0.5rem;
+    }
+    .btn-send {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+    .action-buttons .btn {
+      font-size: 0.85rem;
+      padding: 0.4rem;
+    }
+  </style>
 </head>
-<body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#" style="font-family: 'Poppins', sans-serif; font-size: 24px;">ProductHive 🐝</a>
-        </div>
-    </nav>
+<!-- <body>
+  <div class="container-fluid">
+    <div class="row vh-100">
 
-    <div class="container">
-        <!-- User Interaction Panel -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h4 class="card-title mb-3">Start a Product Debate</h4>
-                <div class="input-group mb-3">
-                    <input type="text" id="topicInput" class="form-control" placeholder="Enter debate topic" />
-                    <button class="btn btn-primary" onclick="startDebate()">Start Debate</button>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-secondary" onclick="continueDebate()">Continue Debate</button>
-                    <button class="btn btn-warning" onclick="revisitTopic()">Revisit Topic</button>
-                    <button class="btn btn-success" onclick="generatePRD()">Generate PRD</button>
-                    <button class="btn btn-info" onclick="saveDebate()">Save Debate</button>
-                </div>
-                <div class="input-group mb-3 mt-3">
-                    <input type="text" id="agentNameInput" class="form-control" placeholder="Enter agent name (exact)" />
-                    <input type="text" id="agentQuestionInput" class="form-control" placeholder="Enter your question" />
-                    <button class="btn btn-outline-primary" onclick="askAgent()">Ask Agent</button>
-                </div>
-            </div>
+      <!-- Left Panel: Chat Interface 
+      <div class="col-md-6 d-flex flex-column p-3 bg-dark text-light">
+        <h3 class="mb-3">Product Chat</h3>
+
+        <!-- Session Controls 
+        <div class="mb-3 d-flex gap-2 align-items-end">
+          <div class="flex-grow-1">
+            <label for="sessionSelect" class="form-label">Session</label>
+            <select id="sessionSelect" class="form-select" onchange="loadSession()">
+              <option value="">-- Select a session --</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn btn-md btn-outline-light" onclick="saveSession()">Save</button>
+          </div>
         </div>
 
-        <!-- Debate History -->
-        <div class="card">
-            <div class="card-body">
-                <h4 class="card-title mb-3">Debate History</h4>
-                <div id="debateHistory"></div>
-            </div>
+        <!-- Chat History 
+        <div id="debateHistory" class="chat-history mb-3"></div>
+
+        <!-- Action Buttons 
+        <div class="action-buttons mb-2 row g-2">
+          <div class="col-6 col-sm-3"><button class="btn btn-outline-light w-100" onclick="startDebate()">Start Debate</button></div>
+          <div class="col-6 col-sm-3"><button class="btn btn-outline-light w-100" onclick="continueDebate()">Continue Debate</button></div>
+          <div class="col-6 col-sm-3"><button class="btn btn-outline-light w-100" onclick="downloadPRD()">Download PRD</button></div>
+          <div class="col-6 col-sm-3"><button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#fullPrdModal">View PRD</button></div>
         </div>
+        
+        <!-- Input Area 
+        <div class="chat-input-container">
+          <div class="chat-input-wrapper">
+            <textarea id="userInput" class="chat-textarea" placeholder="Type topic or @mention question..."></textarea>
+            <button class="btn btn-primary btn-send" onclick="sendMessage()">➤</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: PRD View 
+      <div class="col-md-6 d-flex flex-column p-4 bg-black text-light">
+        <div class="d-flex justify-content-between align-items-center">
+          <h3 class="mb-3">Agent Debate</h3>
+          <div>
+            <button class="btn btn-sm btn-outline-light" onclick="togglePrdFormat()">🔄 Toggle PRD View</button>
+          </div>
+        </div>
+        
+        <div class="mt-3">
+          <h4>📄 PRD</h4>
+          <pre id="prdView" class="bg-dark p-3 border rounded text-light" style="max-height: 300px; overflow-y: auto;"></pre>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <script src="/static/app.js"></script>
+  <!-- Full PRD Modal 
+  <div class="modal fade" id="fullPrdModal" tabindex="-1" aria-labelledby="fullPrdModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content bg-dark text-light">
+        <div class="modal-header">
+          <h5 class="modal-title" id="fullPrdModalLabel">📋 Full Product Requirements Document</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <pre id="fullPrdContent" style="white-space: pre-wrap;"></pre>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html> -->
+<!-- ... (head remains unchanged) ... -->
+<body>
+  <div class="container-fluid">
+    <div class="row vh-100">
+
+      <!-- Left Panel: User Chat Only -->
+      <div class="col-md-6 d-flex flex-column p-3 bg-dark text-light">
+        <h3 class="mb-3">Product Chat</h3>
+        <!-- Session Controls -->
+        <div class="mb-3 d-flex gap-2 align-items-end">
+          <div class="flex-grow-1">
+            <label for="sessionSelect" class="form-label">Session</label>
+            <select id="sessionSelect" class="form-select" onchange="loadSession()">
+              <option value="">-- Select a session --</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn btn-md btn-outline-light" onclick="saveSession()">Save</button>
+          </div>
+        </div>
+        
+        <!-- User Messages History (just user chat, no agent debate) -->
+        <div id="userChatHistory" class="chat-history mb-3"></div>
+        <!-- Action Buttons and Input Area -->
+        <div class="action-buttons mb-2 row g-2">
+          <div class="col-6 col-sm-3"><button class="btn btn-outline-light w-100" onclick="startDebate()">Start Debate</button></div>
+          <div class="col-6 col-sm-3"><button class="btn btn-outline-light w-100" onclick="continueDebate()">Continue Debate</button></div>
+          <div class="col-6 col-sm-3"><button class="btn btn-outline-light w-100" onclick="downloadPRD()">Download PRD</button></div>
+          <div class="col-6 col-sm-3"><button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#fullPrdModal">View PRD</button></div>
+        </div>
+        <div class="chat-input-container">
+          <div class="chat-input-wrapper">
+            <textarea id="userInput" class="chat-textarea" placeholder="Type topic or @mention question..."></textarea>
+            <button class="btn btn-primary btn-send" onclick="sendMessage()">➤</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Debate Only (Scrollable) -->
+      <div class="col-md-6 d-flex flex-column p-4 bg-black text-light">
+        <div class="d-flex justify-content-between align-items-center">
+          <h3 class="mb-3">Agent Debate</h3>
+          <button class="btn btn-sm btn-outline-light" onclick="togglePrdFormat()">🔄 Toggle PRD View</button>
+        </div>
+        <!-- Debate History -->
+        <div class="debate-history" id="debateHistory" style="overflow-y:auto; flex: 1 1 auto; min-height: 400px; max-height: 70vh;"></div>
+        <!-- PRD is hidden here unless toggled -->
+        <div id="prdViewContainer" class="mt-3 d-none">
+          <h4>📄 PRD</h4>
+          <pre id="prdView" class="bg-dark p-3 border rounded text-light" style="max-height: 300px; overflow-y: auto;"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Full PRD Modal... (unchanged) ... -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>
-
