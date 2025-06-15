@@ -27,32 +27,31 @@ class DebateOrchestratorADK:
     async def start_debate(self, topic: str = ""):
         self.current_topic = topic
         self.debate_history = []
-        self.context = {"history": [], "prd_state": {}}
+        self.context = {"history": [], "prd_state": {}, "topic": topic}
 
-        for agent in self.agents:
+        # Use the architect to simulate different agent perspectives
+        agent_roles = ["UX Designer", "Database Expert", "Backend Developer", "Frontend Developer", "Business Analyst"]
+        
+        for role in agent_roles:
             try:
-                # Build the Content object for the prompt
-                prompt = f"Debate topic: {topic}\nAs {agent.name}, provide your opening argument."
-                content = types.Content(role="user", parts=[prompt])
+                prompt = f"""
+Topic: {topic}
 
-                # Build the LlmRequest
-                request = LlmRequest(
-                    model=getattr(agent, "model", None),  # Use the agent's model if available
-                    contents=[content]
-                )
+You are acting as a {role} in a product development debate. 
+Please provide your opening argument and perspective on this topic from the viewpoint of a {role}.
+Focus on the concerns, priorities, and recommendations that a {role} would have.
+"""
+                
+                # Use the same successful pattern as run_round
+                response_chunks = self.app.stream_query(message=prompt, user_id="debate_user")
+                response_text = ''.join([str(chunk) for chunk in response_chunks])
 
-                # Run the agent and gather the response
-                response_text = ""
-                async for chunk in agent.run_async(request):
-                    # If chunk has .text, use it, else fallback to str(chunk)
-                    response_text += getattr(chunk, "text", str(chunk))
-
-                argument = {"agent": agent.name, "text": response_text}
+                argument = {"agent": role.lower().replace(" ", "_"), "text": response_text}
             except Exception as e:
-                argument = {"agent": agent.name, "text": f"Error: {str(e)}"}
+                argument = {"agent": role.lower().replace(" ", "_"), "text": f"Error: {str(e)}"}
 
             self.debate_history.append({
-                "agent": agent.name,
+                "agent": role.lower().replace(" ", "_"),
                 "argument": argument,
             })
             self.context["history"].append(argument)
@@ -62,8 +61,8 @@ class DebateOrchestratorADK:
             "prd_state": self.context["prd_state"],
             "done": False
         }
+    
     def reset(self, topic: str):
-
         self.topic = topic
         self.current_topic = topic
         self.context = {
