@@ -434,7 +434,8 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch('/api/prd_text');
       const data = await res.json();
-      document.getElementById('fullPrdContent').textContent = data.text;
+      const content = document.getElementById('fullPrdContent');
+      content.innerHTML = marked.parse(data.text); // Use marked or similar lib
     } catch (error) {
       console.error('Error loading full PRD:', error);
       document.getElementById('fullPrdContent').textContent = 'Error loading PRD data.';

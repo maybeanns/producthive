@@ -74,6 +74,7 @@ def generate_prd():
 
 @api_blueprint.route('/prd_text', methods=['GET'])
 def prd_text():
+    print(orchestrator.context["prd_state"])  # Debug: See if PRD is filled
     formatted = format_prd_markdown(orchestrator.context["prd_state"])
     return jsonify({"text": formatted})
 
@@ -87,8 +88,20 @@ def list_sessions():
 @api_blueprint.route('/download_prd', methods=['GET'])
 def download_prd():
     orchestrator.context["prd_state"] = normalize_prd(orchestrator.context["prd_state"])
-    path = export_prd_to_docx(orchestrator.context["prd_state"])
-    return send_file(path, as_attachment=True)
+    doc = generate_prd_docx(
+        orchestrator.current_topic,
+        orchestrator.debate_history,
+        orchestrator.context["prd_state"]
+    )
+    prd_stream = io.BytesIO()
+    doc.save(prd_stream)
+    prd_stream.seek(0)
+    return send_file(
+        prd_stream,
+        as_attachment=True,
+        download_name='Product_PRD.docx',
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )
 
 @api_blueprint.route('/save_debate', methods=['POST'])
 def save_debate():
