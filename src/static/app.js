@@ -2,42 +2,41 @@
 
 const apiBase = '/api';
 let debateStarted = false;
-
+let currentRound = 0;
 let userMessages = [];
-
 
 async function startDebate() {
   const input = document.getElementById("userInput").value.trim();
   if (!input) return;
-  const res = await fetch("/api/start_debate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic: input })
-  });
-  const data = await res.json();
-  if (data.error) {
-    alert("Error: " + data.error);
-    return;
+  
+  try {
+    const res = await fetch("/api/start_debate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: input })
+    });
+    const data = await res.json();
+    
+    if (data.error) {
+      alert("Error: " + data.error);
+      return;
+    }
+    
+    debateStarted = true;
+    currentRound = data.round || 1;
+    renderDebate(data.history);
+    renderPRD(data.prd_state);
+    document.getElementById("userInput").value = '';
+    
+    // Update UI to show round info
+    updateRoundInfo();
+    
+  } catch (error) {
+    console.error('Error starting debate:', error);
+    alert("❌ Error starting debate.");
   }
-  renderDebate(data.history);
-  renderPRD(data.prd_state);
-  document.getElementById("userInput").value = '';
 }
-// function renderUserChat() {
-//   const container = document.getElementById("userChatHistory");
-//   container.innerHTML = "";
-//   if (userMessages.length === 0) {
-//     container.innerHTML = '<div class="text-muted">No messages yet. Start a debate or ask something!</div>';
-//     return;
-//   }
-//   userMessages.forEach(msg => {
-//     const msgBox = document.createElement("div");
-//     msgBox.className = "p-2 mb-2 border rounded bg-dark text-light text-end";
-//     msgBox.innerHTML = `<span class="fw-bold">You:</span> ${msg}`;
-//     container.appendChild(msgBox);
-//   });
-//   container.scrollTop = container.scrollHeight;
-// }
+
 async function sendMessage() {
   const input = document.getElementById("userInput").value.trim();
   if (!input) return;
@@ -50,9 +49,12 @@ async function sendMessage() {
       const question = match[2];
       await sendAgentChat(agent, question, input);
     }
+  } else if (!debateStarted) {
+    // Start debate if not started
+    await startDebate();
   } else {
-    // General LLM chat
-    await sendLLMChat(input);
+    // Continue debate with user input
+    await continueDebateWithInput(input);
   }
   document.getElementById("userInput").value = '';
 }
@@ -93,6 +95,12 @@ async function sendAgentChat(agent, question, originalInput) {
   }
 }
 
+async function continueDebateWithInput(input) {
+  userMessages.push(input);
+  renderUserChat();
+  await continueDebate(input);
+}
+
 function renderUserChat() {
   const container = document.getElementById("userChatHistory");
   container.innerHTML = "";
@@ -106,17 +114,20 @@ function renderUserChat() {
   }
   container.scrollTop = container.scrollHeight;
 }
-async function continueDebate() {
+
+async function continueDebate(mention = null) {
   if (!debateStarted) {
     alert("Please start the debate first.");
     return;
   }
-  const mention = document.getElementById("userInput").value.trim();
-  if (mention) {
-    userMessages.push(mention);
-    renderUserChat();
-  }
-  document.getElementById('userInput').value = '';
+
+  // Add loading indicator
+  const debateContainer = document.getElementById("debateHistory");
+  const loadingDiv = document.createElement("div");
+  loadingDiv.className = "p-2 mb-2 border rounded bg-info text-dark";
+  loadingDiv.innerHTML = `<strong>🔄 Round ${currentRound + 1} in progress...</strong><br/>Agents are discussing...`;
+  debateContainer.appendChild(loadingDiv);
+  debateContainer.scrollTop = debateContainer.scrollHeight;
 
   try {
     const res = await fetch("/api/continue_debate", {
@@ -125,49 +136,51 @@ async function continueDebate() {
       body: JSON.stringify({ mention })
     });
 
+    // Remove loading indicator
+    debateContainer.removeChild(loadingDiv);
+
     if (res.ok) {
       const data = await res.json();
+      currentRound = data.round || currentRound + 1;
       renderDebate(data.history);
       renderPRD(data.prd_state, /*show=*/false);
+      updateRoundInfo();
+      
+      if (data.done) {
+        showCompletionMessage();
+      }
     } else {
       const errorData = await res.json();
       alert(`❌ Error continuing debate: ${errorData.error || 'Unknown error'}`);
     }
   } catch (error) {
+    // Remove loading indicator on error
+    if (debateContainer.contains(loadingDiv)) {
+      debateContainer.removeChild(loadingDiv);
+    }
     console.error('Error continuing debate:', error);
     alert("❌ Network error continuing debate.");
   }
 }
 
-function getAgentText(msg) {
-  // Extract the actual text content from the complex JSON structure
-  let rawText = '';
-  
-  if (typeof msg === 'string') {
-    rawText = msg;
-  } else if (msg && msg.argument) {
-    // Parse the JSON string in the argument field
-    try {
-      const parsed = JSON.parse(msg.argument);
-      if (parsed.text) {
-        const textData = JSON.parse(parsed.text);
-        if (textData.content && textData.content.parts && textData.content.parts[0]) {
-          rawText = textData.content.parts[0].text;
-        }
-      }
-    } catch (e) {
-      rawText = JSON.stringify(msg);
-    }
-  } else if (msg && msg.content && Array.isArray(msg.content.parts)) {
-    rawText = msg.content.parts
-      .filter(part => 'text' in part)
-      .map(part => part.text)
-      .join(' ');
-  } else {
-    rawText = JSON.stringify(msg);
+function updateRoundInfo() {
+  // Add round info to the debate header
+  const header = document.querySelector('.col-md-6:last-child h3');
+  if (header && debateStarted) {
+    header.textContent = `Agent Debate - Round ${currentRound}`;
   }
+}
 
-  return formatAgentText(rawText);
+function showCompletionMessage() {
+  const debateContainer = document.getElementById("debateHistory");
+  const completionDiv = document.createElement("div");
+  completionDiv.className = "p-3 mb-2 border rounded bg-success text-dark";
+  completionDiv.innerHTML = `
+    <strong>🎉 Debate Complete!</strong><br/>
+    All agents have reached consensus. The PRD is ready for review and download.
+  `;
+  debateContainer.appendChild(completionDiv);
+  debateContainer.scrollTop = debateContainer.scrollHeight;
 }
 
 function getAgentText(msg) {
@@ -175,30 +188,26 @@ function getAgentText(msg) {
   
   if (typeof msg === 'string') {
     rawText = msg;
-  } else if (msg && msg.text) {  // Changed from msg.argument to msg.text
+  } else if (msg && msg.text) {
     let textStr = msg.text;
     
     try {
-      // The text field contains a JSON-like string, parse it
       const parsed = JSON.parse(textStr);
-      
       if (parsed.content && parsed.content.parts && parsed.content.parts[0] && parsed.content.parts[0].text) {
         rawText = parsed.content.parts[0].text;
       }
     } catch (e) {
-      // Fallback: use regex to extract the actual text content
       const textMatch = textStr.match(/'text':\s*['"](.*?)['"](?:\s*\})/);
       if (textMatch && textMatch[1]) {
         rawText = textMatch[1];
       } else {
-        // Try another pattern for escaped quotes
         const textMatch2 = textStr.match(/'text':\s*['"]((?:[^'"\\]|\\.)*)['"][^}]*\}/);
         if (textMatch2 && textMatch2[1]) {
           rawText = textMatch2[1];
         }
       }
     }
-  } else if (msg && msg.argument) {  // Keep this as fallback
+  } else if (msg && msg.argument) {
     let argumentStr = msg.argument;
     try {
       const parsed = JSON.parse(argumentStr);
@@ -216,7 +225,6 @@ function getAgentText(msg) {
     }
   }
   
-  // If still no content, return empty (don't show debug for empty entries)
   if (!rawText || rawText.length < 10) {
     return "";
   }
@@ -240,7 +248,6 @@ function formatAgentText(text) {
   text = text.replace(/('\}],\s*'role':|"\}],\s*"role":).*$/s, '');
   text = text.replace(/('\},\s*'usage_metadata':|"\},\s*"usage_metadata":).*$/s, '');
 
-  // Clean up the text
   text = text.trim();
 
   // Format the agent type at the beginning
@@ -275,30 +282,51 @@ function formatAgentText(text) {
 
   return text;
 }
+
 function renderDebate(history) {
   const container = document.getElementById("debateHistory");
   container.innerHTML = "";
+  
   if (!history || history.length === 0) {
     container.innerHTML = '<div class="text-muted">No debate history yet. Start a debate to see agent discussions here.</div>';
     return;
   }
+  
   history.forEach((round, i) => {
     const roundBox = document.createElement("div");
-    roundBox.className = "p-2 mb-2 border rounded bg-dark-subtle text-light";
+    roundBox.className = "p-3 mb-3 border rounded bg-dark-subtle text-light";
+    
     const entries = Object.entries(round);
     if (entries.length === 0) {
-      roundBox.innerHTML = `<strong>Round ${i + 1}</strong><br/><em>No agent responses in this round</em>`;
+      roundBox.innerHTML = `<strong>📍 Round ${i + 1}</strong><br/><em>No agent responses in this round</em>`;
     } else {
-      roundBox.innerHTML = `<strong>Round ${i + 1}</strong><br/>` + entries.map(
-        ([agent, msg]) => `<div class="mt-1"><strong>${agent}:</strong> <div class="agent-msg">${getAgentText(msg)}</div></div>`
-      ).join("");
+      // Create round header
+      const roundHeader = `<div class="mb-2"><strong>📍 Round ${i + 1}</strong> <small class="text-muted">(${entries.length} agents participated)</small></div>`;
+      
+      // Create agent responses
+      const agentResponses = entries.map(([agent, msg]) => {
+        const agentText = getAgentText(msg);
+        if (!agentText) return '';
+        
+        return `
+          <div class="agent-response mb-3 p-2 border-start border-primary border-3">
+            <div class="agent-header mb-1">
+              <strong class="text-primary">${agent.replace(/_/g, ' ').toUpperCase()}</strong>
+            </div>
+            <div class="agent-content">${agentText}</div>
+          </div>
+        `;
+      }).filter(response => response).join('');
+      
+      roundBox.innerHTML = roundHeader + agentResponses;
     }
+    
     container.appendChild(roundBox);
   });
+  
   container.scrollTop = container.scrollHeight;
 }
 
-// Only show PRD when toggled or in modal
 function renderPRD(prd, show=false) {
   const view = document.getElementById('prdView');
   const container = document.getElementById('prdViewContainer');
@@ -310,19 +338,6 @@ function renderPRD(prd, show=false) {
     view.textContent = '';
   }
 }
-// // New function specifically for the send button
-// async function sendMessage() {
-//   const input = document.getElementById("userInput").value.trim();
-//   if (!input) return;
-
-//   if (!debateStarted) {
-//     // If debate hasn't started, treat this as starting the debate
-//     await startDebate();
-//   } else {
-//     // If debate is ongoing, continue the debate
-//     await continueDebate();
-//   }
-// }
 
 async function saveSession() {
   try {
@@ -343,9 +358,18 @@ async function loadSession() {
   try {
     const res = await fetch(`/api/load_debate/${sessionId}`);
     const data = await res.json();
+    
+    if (data.error) {
+      alert("Error loading session: " + data.error);
+      return;
+    }
+    
     renderDebate(data.history);
     renderPRD(data.prd_state);
-    debateStarted = true; // Mark debate as started when loading a session
+    debateStarted = true;
+    currentRound = data.round_number || data.history.length;
+    updateRoundInfo();
+    
   } catch (error) {
     console.error('Error loading session:', error);
     alert("❌ Error loading session.");
@@ -369,7 +393,6 @@ async function loadSessionList() {
   }
 }
 
-
 function downloadPRD() {
   if (!debateStarted) {
     alert("Please start a debate first to generate a PRD.");
@@ -377,7 +400,6 @@ function downloadPRD() {
   }
   window.open(`${apiBase}/download_prd`, '_blank');
 }
-rt("Please start a debate first.");
 
 let isJsonView = false;
 async function togglePrdFormat() {
@@ -387,7 +409,6 @@ async function togglePrdFormat() {
   }
   isJsonView = !isJsonView;
   if (isJsonView) {
-    // Show PRD in the right panel
     const res = await fetch('/api/continue_debate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -401,6 +422,7 @@ async function togglePrdFormat() {
     renderPRD(null, /*show=*/false);
   }
 }
+
 document.addEventListener("DOMContentLoaded", () => {
   const modal = document.getElementById('fullPrdModal');
   modal.addEventListener('show.bs.modal', async () => {
@@ -428,6 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
 window.onload = () => {
   loadSessionList();
   renderUserChat();
