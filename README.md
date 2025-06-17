@@ -1,6 +1,7 @@
 # Product Hive 🐝
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![PRD Status](https://img.shields.io/badge/PRD_State-Active-green.svg)
+![Agentic AI](https://img.shields.io/badge/PRD_State-Active-green.svg)
+![Hackathon](https://googlecloudmultiagents.devpost.com/)
 
 Your personal AI product team for structured product development through multi-agent debate systems.
 
@@ -18,6 +19,9 @@ Your personal AI product team for structured product development through multi-a
 - **Workflow Integration** - Export to common project management formats
 
 ## Reference Materials 📚
+### Google ADK
+- [Agent from Google ADK](https://cloud.google.com/vertex-ai/generative-ai/docs/agent-engine/use/adk) - How to use an agent from google agent development kit
+- [Develop Agent from Google ADK](https://cloud.google.com/vertex-ai/generative-ai/docs/agent-engine/develop/adk) - Develop your own custom agent from ADK
 ### Product Requirements Documents
 - [PRD Definition Guide](https://www.rocketblocks.me/blog/what-is-a-prd.php) - Fundamentals of product requirement documents
 - [Google PRD Template](https://docs.google.com/document/d/1zswpYoo3jooC1jK1VceRGrHbjiGxwVvR2ll6PEHKVJk/edit) - Collaborative document template
