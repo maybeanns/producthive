@@ -29,7 +29,7 @@ Your personal AI product team for structured product development through multi-a
 
 ## Development Setup 🛠️
 ```bash
-git clone https://github.com/yourrepo/producthive.git
+git clone https://github.com/maybeanns/producthive.git
 pip install -r requirements.txt
 python src/main.py --config src/config/config.yaml
 ```
