@@ -3,15 +3,16 @@ from agents.db_agent_adk import db_agent
 from agents.backend_agent_adk import backend_agent
 from agents.frontend_agent_adk import frontend_agent
 from agents.business_agent_adk import business_agent
-# from vertexai.preview.text_analysis import TextAnalyzer
 
 from vertexai.preview.reasoning_engines import AdkApp
 from agents.architect_with_subagents import architect
 from shared.prd_state import PRD_TEMPLATE, is_prd_stable
 from tools.architect_toolkit import update_prd_from_agent
 from tools.handle_mentions import extract_mention
-from google.adk.models.llm_request import LlmRequest
-from google.genai import types
+import re
+import uuid
+import json
+import os
 
 class DebateOrchestratorADK:
     def __init__(self):
@@ -23,7 +24,6 @@ class DebateOrchestratorADK:
         self.prd_state = PRD_TEMPLATE.copy()
         self.topic = None
         self.round_number = 0
-        
 
     async def start_debate(self, topic: str = ""):
         """Initialize the debate with the topic and create the first round"""
@@ -75,16 +75,157 @@ class DebateOrchestratorADK:
         self.debate_history.append(round_responses)
         self.context["history"].append(round_responses)
         
-        # Update PRD state based on the round
+        # Update PRD state intelligently using debate context
         consensus = True
         for agent_key, response in round_responses.items():
-            self.context["prd_state"], agreed = update_prd_from_agent(
-                agent_key, response["text"], self.context["prd_state"]
+            # Get debate context for this agent
+            debate_context = self._extract_debate_context_for_agent(agent_key)
+            
+            # Update PRD with intelligent context usage
+            self.context["prd_state"], agreed = self._update_prd_with_debate_context(
+                agent_key, response["text"], self.context["prd_state"], debate_context
             )
             if not agreed:
                 consensus = False
         
         return consensus
+
+    def _extract_debate_context_for_agent(self, agent_key):
+        """Extract relevant debate insights for each agent"""
+        if not self.debate_history:
+            return {}
+        
+        # Collect all responses from this agent across rounds
+        agent_responses = []
+        other_agents_responses = []
+        
+        for round_data in self.debate_history:
+            if agent_key in round_data:
+                agent_responses.append(round_data[agent_key]["text"])
+            
+            # Collect relevant responses from other agents
+            for other_agent, response in round_data.items():
+                if other_agent != agent_key:
+                    other_agents_responses.append(f"{other_agent}: {response['text']}")
+        
+        # Extract key insights
+        debate_context = {
+            "agent_evolution": agent_responses,
+            "team_discussions": other_agents_responses,
+            "consensus_points": self._find_consensus_points(agent_responses + other_agents_responses),
+            "key_decisions": self._extract_key_decisions(other_agents_responses),
+            "integration_points": self._find_integration_mentions(agent_key, other_agents_responses)
+        }
+        
+        return debate_context
+
+    def _find_consensus_points(self, all_responses):
+        """Find points where multiple agents agree"""
+        consensus_indicators = [
+            r"(?:agree|agreed|consensus|decided|team decision).*?([^\n.]{10,80})",
+            r"(?:we should|let's|final decision|requirement).*?([^\n.]{10,80})"
+        ]
+        
+        consensus_points = []
+        full_text = " ".join(all_responses)
+        
+        for pattern in consensus_indicators:
+            matches = re.findall(pattern, full_text, re.IGNORECASE)
+            for match in matches:
+                clean_match = match.strip()
+                if len(clean_match) > 10:
+                    consensus_points.append(clean_match)
+        
+        return list(set(consensus_points))[:5]  # Top 5 unique consensus points
+
+    def _extract_key_decisions(self, responses):
+        """Extract key technical/business decisions from responses"""
+        decision_patterns = [
+            r"(?:decision|choose|selected|decided on|will use).*?([^\n.]{15,100})",
+            r"(?:architecture|technology|approach|strategy).*?([^\n.]{15,100})"
+        ]
+        
+        decisions = []
+        full_text = " ".join(responses)
+        
+        for pattern in decision_patterns:
+            matches = re.findall(pattern, full_text, re.IGNORECASE)
+            for match in matches:
+                clean_match = match.strip()
+                if len(clean_match) > 15:
+                    decisions.append(clean_match)
+        
+        return list(set(decisions))[:3]  # Top 3 decisions
+
+    def _find_integration_mentions(self, agent_key, other_responses):
+        """Find mentions of this agent's domain in other agents' responses"""
+        # Map agent keys to domain keywords
+        domain_keywords = {
+            "ux_designer": ["user", "interface", "experience", "design", "frontend"],
+            "database_expert": ["database", "data", "storage", "query", "backend"],
+            "backend_developer": ["api", "server", "backend", "service", "architecture"],
+            "frontend_developer": ["frontend", "ui", "interface", "client", "browser"],
+            "business_analyst": ["business", "revenue", "market", "strategy", "users"]
+        }
+        
+        keywords = domain_keywords.get(agent_key, [])
+        integration_points = []
+        
+        for response in other_responses:
+            for keyword in keywords:
+                if keyword.lower() in response.lower():
+                    # Extract sentence containing the keyword
+                    sentences = response.split('.')
+                    for sentence in sentences:
+                        if keyword.lower() in sentence.lower():
+                            clean_sentence = sentence.strip()
+                            if len(clean_sentence) > 20:
+                                integration_points.append(clean_sentence)
+                            break
+        
+        return list(set(integration_points))[:3]  # Top 3 integration mentions
+
+    def _update_prd_with_debate_context(self, agent_key, response_text, prd_state, debate_context):
+        """Update PRD intelligently using debate context"""
+        # Create enhanced response that includes debate context
+        enhanced_response = self._create_context_enhanced_response(agent_key, response_text, debate_context)
+        
+        # Use the original update function with enhanced response
+        return update_prd_from_agent(agent_key, enhanced_response, prd_state)
+
+    def _create_context_enhanced_response(self, agent_key, response_text, debate_context):
+        """Create an enhanced response that intelligently incorporates debate context"""
+        
+        # Build context-aware enhancement
+        context_parts = [response_text]
+        
+        # Add consensus points if relevant
+        if debate_context.get("consensus_points"):
+            context_parts.append("\n## Consensus-Based Requirements")
+            for point in debate_context["consensus_points"]:
+                context_parts.append(f"- {point}")
+        
+        # Add key decisions that affect this agent's domain
+        if debate_context.get("key_decisions"):
+            context_parts.append("\n## Key Technical Decisions")
+            for decision in debate_context["key_decisions"]:
+                context_parts.append(f"- {decision}")
+        
+        # Add integration points
+        if debate_context.get("integration_points"):
+            context_parts.append(f"\n## Integration Considerations")
+            for integration in debate_context["integration_points"]:
+                context_parts.append(f"- {integration}")
+        
+        # Add evolution context (how this agent's thinking has developed)
+        if len(debate_context.get("agent_evolution", [])) > 1:
+            context_parts.append(f"\n## Refined Requirements")
+            latest_thinking = debate_context["agent_evolution"][-1]
+            # Extract key refinements
+            if "refine" in latest_thinking.lower() or "update" in latest_thinking.lower():
+                context_parts.append(f"- {latest_thinking[:200]}...")
+        
+        return "\n".join(context_parts)
 
     def _build_round_context(self, mention=None):
         """Build the base context for the current round"""
@@ -100,18 +241,57 @@ class DebateOrchestratorADK:
             }
             context_parts.append(f"User Question for {agent_name}: {msg}")
         
-        context_parts.append(f"Current PRD State: {self.context['prd_state']}")
-        
-        # Include previous rounds' history (not current round)
+        # Include previous rounds' history with better summarization
         if len(self.context["history"]) > 0:
             context_parts.append("Previous Rounds Summary:")
             for round_idx, round_data in enumerate(self.context["history"][-2:], 1):  # Last 2 rounds
-                context_parts.append(f"Round {round_idx} Summary:")
+                context_parts.append(f"Round {round_idx} Key Points:")
                 for agent_name, response in round_data.items():
-                    response_text = response.get("text", str(response))[:150] + "..."
-                    context_parts.append(f"  - {agent_name}: {response_text}")
+                    key_point = self._extract_key_points(response.get("text", ""))
+                    if key_point:
+                        context_parts.append(f"  - {agent_name.replace('_', ' ').title()}: {key_point}")
+        
+        # Add current PRD state summary
+        prd_summary = self._summarize_prd_state(self.context['prd_state'])
+        if prd_summary:
+            context_parts.append(f"\nCurrent PRD Progress: {prd_summary}")
         
         return "\n\n".join(context_parts)
+
+    def _summarize_prd_state(self, prd_state):
+        """Create a brief summary of current PRD state"""
+        if not prd_state or not any(prd_state.values()):
+            return "No PRD content yet"
+        
+        summary_parts = []
+        for section, content in prd_state.items():
+            if content and content.strip():
+                summary_parts.append(f"{section}: {len(content.split())} words")
+        
+        return ", ".join(summary_parts) if summary_parts else "Minimal content"
+
+    def _extract_key_points(self, text):
+        """Extract key points for debate history"""
+        if not text:
+            return ""
+        
+        # Look for key decision points
+        key_patterns = [
+            r'(?:decision|agree|recommend|suggest|must|should|requirement).*?([^\n.]{20,100})',
+            r'(?:important|critical|essential|key).*?([^\n.]{20,100})'
+        ]
+        
+        for pattern in key_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                return matches[0].strip()
+        
+        # Fallback to first meaningful sentence
+        sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 20]
+        if sentences:
+            return sentences[0][:100] + "..." if len(sentences[0]) > 100 else sentences[0]
+        
+        return text[:100] + "..." if len(text) > 100 else text
 
     def _build_agent_prompt(self, role, base_context, current_round_responses):
         """Build the prompt for a specific agent including responses from other agents in this round"""
@@ -156,10 +336,6 @@ Focus on moving the discussion forward and refining the PRD.
         self.debate_history = []
         self.prd_state = PRD_TEMPLATE.copy()
 
-    def _build_context_prompt(self, mention=None):
-        """Legacy method - kept for compatibility"""
-        return self._build_round_context(mention)
-
     async def run_round(self, mention: str = None):
         """Continue the debate with a new round"""
         if not self.context or "prd_state" not in self.context:
@@ -179,7 +355,6 @@ Focus on moving the discussion forward and refining the PRD.
         return self.debate_history
 
     async def save_debate(self):
-        import uuid, json, os
         session_id = str(uuid.uuid4())
         os.makedirs("data/debates", exist_ok=True)
         save_data = {
@@ -193,7 +368,6 @@ Focus on moving the discussion forward and refining the PRD.
         return session_id
 
     async def load_debate(self, session_id):
-        import json
         try:
             with open(f"data/debates/{session_id}.json", "r") as f:
                 data = json.load(f)

@@ -1,7 +1,7 @@
 # Product Hive 🐝
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Agentic AI](https://img.shields.io/badge/PRD_State-Active-green.svg)
-![Hackathon](https://googlecloudmultiagents.devpost.com/)
+![Agentic AI](https://img.shields.io/badge/Mode-AgenticAI-green.svg)
+![Hackathon](https://img.shields.io/badge/Purpose-Hackathon-blue)
 
 Your personal AI product team for structured product development through multi-agent debate systems.
 
@@ -29,7 +29,7 @@ Your personal AI product team for structured product development through multi-a
 
 ## Development Setup 🛠️
 ```bash
-git clone https://github.com/yourrepo/producthive.git
+git clone https://github.com/maybeanns/producthive.git
 pip install -r requirements.txt
 python src/main.py --config src/config/config.yaml
 ```

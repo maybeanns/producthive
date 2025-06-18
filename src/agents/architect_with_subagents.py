@@ -31,9 +31,6 @@ business_agent = LlmAgent(
     instruction="""You are a business expert in the debate..."""
 )
 
-# Coordinator/architect agent with all subagents attached
-from google.adk.agents import LlmAgent
-
 architect = LlmAgent(
     name="architect",
     model="gemini-2.0-flash-lite-001",
