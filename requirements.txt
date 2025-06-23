@@ -4,6 +4,9 @@ autopep8
 google-cloud-aiplatform 
 langchain 
 langchain-google-vertexai
-
+vertexai.preview.reasoning_engines
+langsmith
+google-generativeai
+vertexai
 # App
 flask

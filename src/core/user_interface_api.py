@@ -15,7 +15,8 @@ from tools.export_prd import export_prd_to_docx
 from tools.format_prd import format_prd_markdown
 from tools.normalize_prd import normalize_prd
 from tools.architect_toolkit import debug_prd_state, validate_prd_state
-
+from tools.vertex_llm import VertexLLM
+import json
 api_blueprint = Blueprint('api', __name__)
 
 agents = [ux_agent, db_agent, backend_agent, frontend_agent, business_agent]
@@ -23,6 +24,18 @@ orchestrator = DebateOrchestratorADK()
 
 # Set agents in orchestrator
 orchestrator.agents = agents
+
+try:
+    chat_llm = VertexLLM(
+        project="your-project-id",  # Replace with your actual project ID
+        location="us-central1", 
+        model="gemini-2.0-flash-lite-001"
+    )
+    chat_history = []  
+except Exception as e:
+    print(f"Warning: Could not initialize chat LLM: {e}")
+    chat_llm = None
+    chat_history = []
 
 @api_blueprint.route('/start_debate', methods=['POST'])
 def start_debate():
@@ -280,3 +293,103 @@ def clean_prd():
     orchestrator.context["prd_state"] = validate_prd_state(orchestrator.context["prd_state"])
     orchestrator.context["prd_state"] = normalize_prd(orchestrator.context["prd_state"])
     return jsonify(orchestrator.context["prd_state"])
+
+
+
+@api_blueprint.route('/chat', methods=['POST'])
+def chat_with_prd():
+    """Handle user chat messages about the PRD"""
+    global chat_history
+    
+    if not chat_llm:
+        return jsonify({"error": "Chat functionality not available"}), 500
+    
+    data = request.json
+    user_message = data.get("message", "").strip()
+    
+    if not user_message:
+        return jsonify({"error": "Message is required"}), 400
+    
+    try:
+        # Get current PRD state
+        current_prd = orchestrator.context.get("prd_state", {}) if orchestrator.context else {}
+        
+        # Format recent chat history
+        recent_chat = ""
+        if chat_history:
+            recent_exchanges = chat_history[-5:]  # Last 5 exchanges
+            recent_chat = "\n".join([
+                f"User: {exchange['user']}\nAssistant: {exchange['assistant']}"
+                for exchange in recent_exchanges
+            ])
+        
+        # Build context prompt
+        context_prompt = f"""You are a helpful AI assistant discussing a Product Requirements Document (PRD) that was created through a collaborative debate between multiple expert agents (UX Designer, Database Expert, Backend Developer, Frontend Developer, and Business Analyst).
+
+Current PRD Content:
+{json.dumps(current_prd, indent=2)}
+
+Current Topic: {orchestrator.current_topic}
+Debate Rounds Completed: {orchestrator.round_number}
+
+Recent Chat History:
+{recent_chat if recent_chat else "No previous chat history."}
+
+Current User Question: {user_message}
+
+Please provide a helpful, informative response about the PRD, the debate process, or answer the user's question. Be conversational and helpful. If the user asks about specific sections of the PRD, reference the actual content. If they want to know about the debate process, explain what happened."""
+
+        # Get response from Vertex LLM
+        response = asyncio.run(chat_llm.ask(context_prompt))
+        
+        # Store in chat history
+        chat_entry = {
+            "user": user_message,
+            "assistant": response,
+            "timestamp": datetime.now().isoformat()
+        }
+        chat_history.append(chat_entry)
+        
+        # Keep only last 20 exchanges to prevent memory issues
+        if len(chat_history) > 20:
+            chat_history = chat_history[-20:]
+        
+        return jsonify({
+            "response": response,
+            "timestamp": chat_entry["timestamp"]
+        })
+        
+    except Exception as e:
+        error_response = f"I apologize, but I encountered an error: {str(e)}"
+        chat_entry = {
+            "user": user_message,
+            "assistant": error_response,
+            "timestamp": datetime.now().isoformat()
+        }
+        chat_history.append(chat_entry)
+        
+        return jsonify({
+            "response": error_response,
+            "timestamp": chat_entry["timestamp"]
+        }), 500
+
+@api_blueprint.route('/chat/history', methods=['GET'])
+def get_chat_history():
+    """Get the chat history"""
+    return jsonify({"history": chat_history})
+
+@api_blueprint.route('/chat/clear', methods=['POST'])
+def clear_chat_history():
+    """Clear the chat history"""
+    global chat_history
+    chat_history = []
+    return jsonify({"status": "Chat history cleared"})
+
+@api_blueprint.route('/chat/status', methods=['GET'])
+def chat_status():
+    """Check if chat is available"""
+    return jsonify({
+        "available": chat_llm is not None,
+        "history_count": len(chat_history),
+        "prd_available": bool(orchestrator.context and orchestrator.context.get("prd_state"))
+    })

@@ -376,6 +376,7 @@ async function loadSession() {
   }
 }
 
+
 async function loadSessionList() {
   try {
     const res = await fetch('/api/list_sessions');
