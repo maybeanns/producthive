@@ -265,8 +265,18 @@ class DebateOrchestratorADK:
         
         summary_parts = []
         for section, content in prd_state.items():
-            if content and content.strip():
-                summary_parts.append(f"{section}: {len(content.split())} words")
+            if content:
+                # Handle both string and list content
+                if isinstance(content, list):
+                    # For lists, check if any items exist and count them
+                    non_empty_items = [item for item in content if item and str(item).strip()]
+                    if non_empty_items:
+                        summary_parts.append(f"{section}: {len(non_empty_items)} items")
+                elif isinstance(content, str) and content.strip():
+                    # For strings, count words
+                    summary_parts.append(f"{section}: {len(content.split())} words")
+                elif content:  # Handle other types (dict, etc.)
+                    summary_parts.append(f"{section}: present")
         
         return ", ".join(summary_parts) if summary_parts else "Minimal content"
 

@@ -2,38 +2,79 @@
 
 import re
 import json
+from typing import Dict, List, Any, Optional
+from datetime import datetime
 
+# Define PRD sections in order of appearance
 PRD_SECTIONS = [
-    "introduction",
-    "customer_needs", 
-    "known_requests",
-    "customer_data",
-    "business_model",
-    "expected_results",
-    "marketing_plan",
-    "metrics",
-    "terms",
-    "personas",
-    "features",
-    "non_functional",
+    "project_overview",
+    "objectives", 
+    "user_stories",
+    "functional_requirements",
+    "non_functional_requirements",
+    "technical_specifications",
+    "success_metrics",
     "design_notes",
-    "technical_specs"
+    "next_steps"
 ]
 
 # Define which sections should be lists vs text
 LIST_SECTIONS = {
-    "customer_needs", "known_requests", "features", "personas", 
-    "metrics", "terms", "non_functional"
+    "objectives", "user_stories", "functional_requirements", 
+    "non_functional_requirements", "success_metrics", "next_steps"
+}
+
+# Define subsections for complex sections
+SECTION_SUBSECTIONS = {
+    "functional_requirements": [
+        "core_functionality",
+        "api_requirements",
+        "integration_capabilities"
+    ],
+    "non_functional_requirements": [
+        "performance_and_scalability",
+        "security_and_reliability", 
+        "user_experience"
+    ],
+    "technical_specifications": [
+        "database_design",
+        "backend_architecture",
+        "frontend_framework"
+    ],
+    "success_metrics": [
+        "key_performance_indicators",
+        "business_metrics"
+    ],
+    "design_notes": [
+        "ux_considerations",
+        "technical_considerations"
+    ]
 }
 
 def initialize_prd_state():
     """Initialize empty PRD state with proper structure"""
-    prd_state = {}
+    prd_state = {
+        "project_name": "Agent Creator",
+        "generated_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "sections": {}
+    }
+    
     for section in PRD_SECTIONS:
-        if section in LIST_SECTIONS:
-            prd_state[section] = []
+        if section in SECTION_SUBSECTIONS:
+            # Initialize complex sections with subsections
+            prd_state["sections"][section] = {}
+            for subsection in SECTION_SUBSECTIONS[section]:
+                if section in LIST_SECTIONS:
+                    prd_state["sections"][section][subsection] = []
+                else:
+                    prd_state["sections"][section][subsection] = ""
         else:
-            prd_state[section] = ""
+            # Initialize simple sections
+            if section in LIST_SECTIONS:
+                prd_state["sections"][section] = []
+            else:
+                prd_state["sections"][section] = ""
+    
     return prd_state
 
 def extract_prd_content_from_text(text):
@@ -42,6 +83,12 @@ def extract_prd_content_from_text(text):
     """
     extracted_content = {}
     
+    # Clean the input text first
+    text = _clean_agent_content(text)
+    
+    if not text or _is_generic_content(text):
+        return extracted_content
+    
     # Strategy 1: Look for explicit section headers
     section_regex = re.compile(r"^([A-Za-z _\-]+):\s*((?:.|\n)*?)(?=^[A-Za-z _\-]+:|\Z)", re.MULTILINE)
     matches = section_regex.findall(text)
@@ -49,174 +96,586 @@ def extract_prd_content_from_text(text):
     for section, content in matches:
         key = section.strip().lower().replace(" ", "_").replace("-", "_")
         if key in PRD_SECTIONS:
-            if key in LIST_SECTIONS:
-                # Parse list items
-                items = []
-                lines = content.strip().split('\n')
-                for line in lines:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        # Remove bullet points and dashes
-                        clean_line = re.sub(r'^[-•*]\s*', '', line).strip()
-                        if clean_line:
-                            items.append(clean_line)
-                extracted_content[key] = items
-            else:
-                extracted_content[key] = content.strip()
+            content = content.strip()
+            if not _is_generic_content(content):
+                if key in LIST_SECTIONS:
+                    # Parse list items
+                    items = _extract_list_items(content)
+                    if items:
+                        extracted_content[key] = items
+                else:
+                    extracted_content[key] = content
     
     # Strategy 2: Keyword-based extraction for common patterns
     keyword_patterns = {
-        'customer_needs': r'(?:customer needs?|user needs?|requirements?)[:\s]*(.*?)(?=\n\n|\n[A-Z]|\Z)',
-        'features': r'(?:features?|functionality)[:\s]*(.*?)(?=\n\n|\n[A-Z]|\Z)',
-        'technical_specs': r'(?:technical|technology|stack|architecture)[:\s]*(.*?)(?=\n\n|\n[A-Z]|\Z)',
-        'business_model': r'(?:business model|monetization|revenue)[:\s]*(.*?)(?=\n\n|\n[A-Z]|\Z)',
-        'personas': r'(?:personas?|users?|target audience)[:\s]*(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        'project_overview': [
+            r'(?:project|product|platform|system|application)(?:\s+overview)?[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:about|description|what is)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        'objectives': [
+            r'(?:objectives?|goals?|aims?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:business\s+)?(?:objectives?|goals?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        'user_stories': [
+            r'(?:user\s+stories?|user\s+requirements?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:as\s+a\s+user|user\s+needs?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        'functional_requirements': [
+            r'(?:functional\s+requirements?|features?|functionality)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:core\s+functionality|main\s+features?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        'non_functional_requirements': [
+            r'(?:non.?functional\s+requirements?|performance|scalability|security)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:quality\s+attributes?|system\s+requirements?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        'technical_specifications': [
+            r'(?:technical\s+specifications?|technology\s+stack|architecture)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:database|backend|frontend|api)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        'success_metrics': [
+            r'(?:success\s+metrics?|kpis?|key\s+performance\s+indicators?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:metrics?|measurements?|tracking)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        'design_notes': [
+            r'(?:design\s+notes?|ux\s+considerations?|ui\s+requirements?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ]
     }
     
-    for section, pattern in keyword_patterns.items():
+    for section, pattern_list in keyword_patterns.items():
         if section not in extracted_content:
-            matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
-            if matches:
-                content = matches[0].strip()
-                if content:
-                    if section in LIST_SECTIONS:
-                        items = [item.strip() for item in content.split('\n') if item.strip()]
-                        extracted_content[section] = items
-                    else:
-                        extracted_content[section] = content
+            for pattern in pattern_list:
+                matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
+                if matches:
+                    match_content = matches[0].strip()
+                    if match_content and not _is_generic_content(match_content):
+                        if section in LIST_SECTIONS:
+                            items = _extract_list_items(match_content)
+                            if items:
+                                extracted_content[section] = items
+                        else:
+                            extracted_content[section] = match_content
+                    break
     
     return extracted_content
 
-def update_prd_from_agent(agent_name, agent_response, prd_state):
-    """
-    Enhanced PRD update function with better content extraction
-    """
-    print(f"Updating PRD from {agent_name}")
-    print(f"Agent response preview: {agent_response[:200]}...")
-    
-    # Extract content from agent response
-    extracted_content = extract_prd_content_from_text(agent_response)
-    
-    # Agent-specific content mapping
-    agent_focus_areas = {
-        'UX Agent': ['customer_needs', 'personas', 'features'],
-        'DB Agent': ['technical_specs', 'non_functional'],
-        'Backend Agent': ['technical_specs', 'non_functional', 'features'],
-        'Frontend Agent': ['features', 'technical_specs'],
-        'Business Agent': ['business_model', 'marketing_plan', 'metrics', 'expected_results']
-    }
-    
-    # Apply agent-specific content extraction
-    focus_areas = agent_focus_areas.get(agent_name, PRD_SECTIONS)
-    
-    updated_sections = []
-    for section in focus_areas:
-        if section in extracted_content:
-            current_value = prd_state.get(section, [] if section in LIST_SECTIONS else "")
-            new_value = extracted_content[section]
-            
-            if section in LIST_SECTIONS:
-                # Merge lists, avoiding duplicates
-                if isinstance(current_value, list) and isinstance(new_value, list):
-                    combined = current_value + [item for item in new_value if item not in current_value]
-                    prd_state[section] = combined
-                elif isinstance(new_value, list):
-                    prd_state[section] = new_value
-                updated_sections.append(section)
-            else:
-                # For text sections, append or replace
-                if current_value and new_value:
-                    prd_state[section] = current_value + "\n\n" + new_value
-                elif new_value:
-                    prd_state[section] = new_value
-                updated_sections.append(section)
-    
-    # Fallback: Extract any relevant information and categorize by agent type
-    if not updated_sections:
-        print(f"No explicit sections found, using fallback extraction for {agent_name}")
-        fallback_content = extract_fallback_content(agent_name, agent_response)
-        for section, content in fallback_content.items():
-            if content:
-                if section in LIST_SECTIONS:
-                    if isinstance(content, list):
-                        prd_state[section].extend(content)
-                    else:
-                        prd_state[section].append(content)
-                else:
-                    if prd_state[section]:
-                        prd_state[section] += "\n\n" + content
-                    else:
-                        prd_state[section] = content
-                updated_sections.append(section)
-    
-    print(f"Updated sections: {updated_sections}")
-    return prd_state, len(updated_sections) > 0
+GENERIC_RESPONSES = [
+    r"to be defined.*",
+    r"no data available.*",
+    r"n/a",
+    r"not applicable",
+    r"^(\s)*$",
+    r"tbd",
+    r"placeholder",
+    r"coming soon"
+]
 
-def extract_fallback_content(agent_name, response):
-    """
-    Extract content based on agent type when no explicit sections are found
-    """
-    content = {}
-    
-    if 'UX' in agent_name or 'UI' in agent_name:
-        # UX agents focus on user needs and interface
-        if 'user' in response.lower() or 'customer' in response.lower():
-            content['customer_needs'] = [response[:500]]  # Truncate for brevity
-        if 'feature' in response.lower():
-            content['features'] = [response[:500]]
-            
-    elif 'DB' in agent_name or 'Database' in agent_name:
-        # Database agents focus on technical specs
-        content['technical_specs'] = response[:500]
+def is_generic(text):
+    """Check if text is generic/placeholder content"""
+    if not text:
+        return True
         
-    elif 'Backend' in agent_name:
-        # Backend agents focus on technical implementation
-        content['technical_specs'] = response[:500]
-        if 'feature' in response.lower():
-            content['features'] = [response[:300]]
-            
-    elif 'Frontend' in agent_name:
-        # Frontend agents focus on features and technical specs
-        content['features'] = [response[:300]]
-        content['technical_specs'] = response[:500]
-        
-    elif 'Business' in agent_name:
-        # Business agents focus on business aspects
-        content['business_model'] = response[:500]
-        if 'market' in response.lower():
-            content['marketing_plan'] = response[:500]
+    text = text.strip().lower()
     
-    return content
+    for pattern in GENERIC_RESPONSES:
+        if re.match(pattern, text):
+            return True
+    
+    return len(text) < 10  # Very short content is likely generic
+
+def update_prd_from_agent(agent_name, content, prd_state):
+    """
+    Insert agent response into appropriate PRD section.
+    Only fills section if content is not a generic placeholder.
+    Returns updated prd_state and True if any section was updated.
+    """
+    # Ensure PRD state is properly initialized
+    if not prd_state or "sections" not in prd_state:
+        prd_state = initialize_prd_state()
+    
+    # Ensure all required sections exist
+    _ensure_prd_sections_exist(prd_state)
+    
+    updated = False
+    content = content.strip()
+    
+    if is_generic(content):
+        return prd_state, False
+
+    # Extract content based on agent expertise
+    agent_insights = _extract_agent_insights(agent_name, content)
+    
+    # Update PRD state with insights
+    if agent_insights:
+        updated = _update_prd_state_with_insights(prd_state, agent_insights)
+    
+    # Legacy fallback: Try to match a PRD section in the content itself
+    if not updated:
+        extracted_content = extract_prd_content_from_text(content)
+        if extracted_content:
+            updated = _update_prd_state_with_insights(prd_state, extracted_content)
+    
+    # Final fallback: Map by agent type if not already updated
+    if not updated:
+        section_map = {
+            "ux_agent": "user_stories",
+            "ux_designer": "user_stories",
+            "db_agent": "technical_specifications",
+            "database_expert": "technical_specifications",
+            "backend_agent": "functional_requirements",
+            "backend_developer": "functional_requirements",
+            "frontend_agent": "functional_requirements",
+            "frontend_developer": "functional_requirements",
+            "business_agent": "objectives",
+            "business_analyst": "objectives",
+        }
+        
+        agent_key = agent_name.lower().replace(" ", "_")
+        target_section = section_map.get(agent_key)
+        
+        if target_section and target_section in prd_state["sections"]:
+            if isinstance(prd_state["sections"][target_section], list):
+                if not prd_state["sections"][target_section]:
+                    prd_state["sections"][target_section] = [content[:500]]
+                    updated = True
+            elif isinstance(prd_state["sections"][target_section], dict):
+                # For complex sections, add to first empty subsection
+                for subsection in prd_state["sections"][target_section]:
+                    if not prd_state["sections"][target_section][subsection]:
+                        prd_state["sections"][target_section][subsection] = content[:500]
+                        updated = True
+                        break
+            else:
+                if not prd_state["sections"][target_section]:
+                    prd_state["sections"][target_section] = content[:500]
+                    updated = True
+
+    return prd_state, updated
 
 def validate_prd_state(prd_state):
     """
-    Validate and clean PRD state
+    Validate and clean PRD state, generate clean PRD markdown
     """
-    for section in PRD_SECTIONS:
-        if section not in prd_state:
-            if section in LIST_SECTIONS:
-                prd_state[section] = []
-            else:
-                prd_state[section] = ""
-        
-        # Clean empty values
-        if section in LIST_SECTIONS:
-            prd_state[section] = [item for item in prd_state[section] if item and item.strip()]
-        else:
-            prd_state[section] = prd_state[section].strip() if prd_state[section] else ""
+    # Ensure PRD state is properly initialized
+    if not prd_state or "sections" not in prd_state:
+        prd_state = initialize_prd_state()
     
-    return prd_state
+    # Ensure all sections exist with proper structure
+    _ensure_prd_sections_exist(prd_state)
+    
+    # Add default next steps if empty
+    if not prd_state["sections"]["next_steps"]:
+        prd_state["sections"]["next_steps"] = [
+            "Conduct comprehensive market analysis and user research",
+            "Define detailed user personas and user journeys", 
+            "Create detailed functional specifications for each feature",
+            "Develop technical architecture diagrams",
+            "Establish development timeline and resource requirements",
+            "Define testing and quality assurance procedures"
+        ]
+    
+    # Generate clean PRD markdown
+    return _generate_clean_prd_markdown(prd_state)
 
 def debug_prd_state(prd_state):
     """
     Debug function to print PRD state
     """
-    print("\n=== PRD STATE DEBUG ===")
-    for section, content in prd_state.items():
-        if isinstance(content, list):
-            print(f"{section}: {len(content)} items")
-            for i, item in enumerate(content[:3]):  # Show first 3 items
-                print(f"  {i+1}. {item[:100]}...")
-        else:
-            print(f"{section}: {len(content)} chars - {content[:100]}...")
+    if not isinstance(prd_state, dict):
+        print("\n=== PRD DEBUG: Invalid PRD state type ===")
+        print(f"Type: {type(prd_state)} - Value: {prd_state}")
+        return
+    if not prd_state:
+        print("\n=== PRD DEBUG: PRD state is None ===")
+        return
+    
+    project_name = prd_state.get("project_name", "Unknown Project")
+    print(f"\n=== PRD DEBUG: {project_name} ===")
+    
+    if "sections" in prd_state:
+        for section, content in prd_state["sections"].items():
+            if isinstance(content, dict):
+                print(f"{section}: {len(content)} subsections")
+                for subsection, subcontent in content.items():
+                    if isinstance(subcontent, list):
+                        print(f"  {subsection}: {len(subcontent)} items")
+                    else:
+                        print(f"  {subsection}: {len(str(subcontent))} chars")
+            elif isinstance(content, list):
+                print(f"{section}: {len(content)} items")
+            else:
+                print(f"{section}: {len(str(content))} chars")
+    else:
+        print("No sections found in PRD state")
+    
     print("=== END PRD DEBUG ===\n")
+
+# Helper functions (private)
+
+def _ensure_prd_sections_exist(prd_state):
+    """Ensure all required PRD sections exist in the state"""
+    if "sections" not in prd_state:
+        prd_state["sections"] = {}
+    
+    for section in PRD_SECTIONS:
+        if section not in prd_state["sections"]:
+            if section in SECTION_SUBSECTIONS:
+                prd_state["sections"][section] = {}
+                for subsection in SECTION_SUBSECTIONS[section]:
+                    if section in LIST_SECTIONS:
+                        prd_state["sections"][section][subsection] = []
+                    else:
+                        prd_state["sections"][section][subsection] = ""
+            else:
+                if section in LIST_SECTIONS:
+                    prd_state["sections"][section] = []
+                else:
+                    prd_state["sections"][section] = ""
+
+def _clean_agent_content(content):
+    """Clean agent content by removing metadata and formatting issues"""
+    # Remove common metadata patterns
+    content = re.sub(r'\{[^}]*\}', '', content)  # Remove JSON-like structures
+    content = re.sub(r'Generated on:.*?\n', '', content)
+    content = re.sub(r'Project:.*?\n', '', content)
+    content = re.sub(r'\\n\\n', '\n\n', content)  # Fix escaped newlines
+    content = re.sub(r'\\[nt]', ' ', content)  # Remove escaped characters
+    content = re.sub(r'\*\*([^*]+)\*\*', r'\1', content)  # Remove bold markdown
+    content = re.sub(r'\s+', ' ', content)  # Normalize whitespace
+    content = re.sub(r'[\'"]{2,}', '', content)  # Remove multiple quotes
+    
+    return content.strip()
+
+def _is_generic_content(text):
+    """Check if content is generic/placeholder text"""
+    return is_generic(text)
+
+def _extract_list_items(text):
+    """Extract list items from text content"""
+    items = []
+    
+    # Split by common list separators
+    lines = text.replace('\r\n', '\n').split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Remove bullet points, numbers, and dashes
+        clean_line = re.sub(r'^[-•*\d+\.\)\s]+', '', line).strip()
+        if clean_line and len(clean_line) > 5:  # Avoid very short items
+            items.append(clean_line)
+    
+    # If no clear list structure, split by sentences
+    if not items and len(text) > 50:
+        sentences = re.split(r'[.!?]+', text)
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if sentence and len(sentence) > 10:
+                items.append(sentence)
+    
+    return items[:10]  # Limit to 10 items max
+
+def _extract_agent_insights(agent_name, content):
+    """Extract structured insights from agent responses based on agent expertise"""
+    insights = {}
+    content = _clean_agent_content(content)
+    
+    if not content or _is_generic_content(content):
+        return insights
+    
+    # Map agents to their primary focus areas
+    agent_mapping = {
+        "ux_designer": {
+            "primary_sections": ["user_stories", "design_notes"],
+            "subsections": {
+                "design_notes": ["ux_considerations"],
+                "functional_requirements": ["core_functionality"]
+            }
+        },
+        "database_expert": {
+            "primary_sections": ["technical_specifications"],
+            "subsections": {
+                "technical_specifications": ["database_design"],
+                "non_functional_requirements": ["performance_and_scalability"]
+            }
+        },
+        "backend_developer": {
+            "primary_sections": ["technical_specifications", "functional_requirements"],
+            "subsections": {
+                "technical_specifications": ["backend_architecture"],
+                "functional_requirements": ["api_requirements"],
+                "non_functional_requirements": ["security_and_reliability"]
+            }
+        },
+        "frontend_developer": {
+            "primary_sections": ["functional_requirements", "design_notes"],
+            "subsections": {
+                "functional_requirements": ["core_functionality"],
+                "technical_specifications": ["frontend_framework"],
+                "non_functional_requirements": ["user_experience"]
+            }
+        },
+        "business_analyst": {
+            "primary_sections": ["objectives", "success_metrics", "project_overview"],
+            "subsections": {
+                "success_metrics": ["key_performance_indicators", "business_metrics"]
+            }
+        }
+    }
+    
+    # Extract content using general patterns first
+    extracted_content = extract_prd_content_from_text(content)
+    
+    # Then map to agent-specific areas
+    agent_key = agent_name.lower().replace(" ", "_")
+    if agent_key in agent_mapping:
+        mapping = agent_mapping[agent_key]
+        
+        # Prioritize content for agent's primary sections
+        for section in mapping["primary_sections"]:
+            if section in extracted_content:
+                insights[section] = extracted_content[section]
+        
+        # Handle subsections
+        if "subsections" in mapping:
+            for section, subsections in mapping["subsections"].items():
+                for subsection in subsections:
+                    # Look for subsection-specific content in the text
+                    subsection_content = _extract_subsection_content(content, subsection)
+                    if subsection_content:
+                        if section not in insights:
+                            insights[section] = {}
+                        # Ensure the section is a dict before assigning subsection
+                        elif not isinstance(insights[section], dict):
+                            # Convert existing content to dict structure
+                            existing_content = insights[section]
+                            insights[section] = {subsection: subsection_content}
+                            # Try to fit existing content in appropriate subsection
+                            if subsections and len(subsections) > 1:
+                                insights[section][subsections[0]] = existing_content
+                        else:
+                            insights[section][subsection] = subsection_content
+    
+    # If no specific mapping, use general extraction
+    if not insights:
+        insights = extracted_content
+    
+    return insights
+
+def _extract_subsection_content(content, subsection):
+    """Extract content for specific subsections"""
+    subsection_patterns = {
+        "ux_considerations": [
+            r'(?:ux|user experience|interface|usability)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:design|ui|interface)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "database_design": [
+            r'(?:database|schema|data model)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:storage|persistence)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "backend_architecture": [
+            r'(?:backend|server|api)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:architecture|system design)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "frontend_framework": [
+            r'(?:frontend|client|ui framework)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:react|vue|angular)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "performance_and_scalability": [
+            r'(?:performance|scalability|scale)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:load|capacity|throughput)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "security_and_reliability": [
+            r'(?:security|authentication|authorization)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:reliability|availability|uptime)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "user_experience": [
+            r'(?:user experience|ux|usability)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:accessibility|responsive)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "core_functionality": [
+            r'(?:core|main|primary)\s+(?:functionality|features?)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:key features?|main capabilities)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "api_requirements": [
+            r'(?:api|rest|endpoint)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:service|integration)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "key_performance_indicators": [
+            r'(?:kpi|key performance|metrics)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:measure|track|monitor)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ],
+        "business_metrics": [
+            r'(?:business|revenue|profit)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)',
+            r'(?:roi|return on investment)[:\s]+(.*?)(?=\n\n|\n[A-Z]|\Z)'
+        ]
+    }
+    
+    patterns = subsection_patterns.get(subsection, [])
+    for pattern in patterns:
+        matches = re.findall(pattern, content, re.IGNORECASE | re.DOTALL)
+        if matches:
+            match_content = matches[0].strip()
+            if match_content and not _is_generic_content(match_content):
+                return match_content
+    
+    return ""
+
+def _update_prd_state_with_insights(prd_state, insights):
+    """Update PRD state with extracted insights"""
+    # Ensure sections exist before updating
+    if "sections" not in prd_state:
+        prd_state["sections"] = {}
+    
+    _ensure_prd_sections_exist(prd_state)
+    
+    updated = False
+    
+    for section, content in insights.items():
+        if section in prd_state["sections"]:
+            if isinstance(content, dict):
+                # Handle subsections
+                current_section = prd_state["sections"][section]
+                
+                # Ensure current section is a dict to support subsections
+                if not isinstance(current_section, dict):
+                    # Convert to dict structure if it's not already
+                    if section in SECTION_SUBSECTIONS:
+                        # Initialize with proper subsection structure
+                        prd_state["sections"][section] = {}
+                        for subsection in SECTION_SUBSECTIONS[section]:
+                            if section in LIST_SECTIONS:
+                                prd_state["sections"][section][subsection] = []
+                            else:
+                                prd_state["sections"][section][subsection] = ""
+                        current_section = prd_state["sections"][section]
+                    else:
+                        # Convert existing content to first subsection
+                        existing_content = current_section
+                        prd_state["sections"][section] = {}
+                        first_key = list(content.keys())[0] if content else "general"
+                        prd_state["sections"][section][first_key] = existing_content
+                        current_section = prd_state["sections"][section]
+                
+                # Now update subsections
+                for subsection, subcontent in content.items():
+                    if subsection in current_section:
+                        if not current_section[subsection] or _is_generic_content(str(current_section[subsection])):
+                            current_section[subsection] = subcontent
+                            updated = True
+                    else:
+                        # Add new subsection
+                        current_section[subsection] = subcontent
+                        updated = True
+            else:
+                # Handle simple content
+                current_content = prd_state["sections"][section]
+                if isinstance(current_content, list):
+                    if not current_content:
+                        if isinstance(content, list):
+                            prd_state["sections"][section] = content
+                        else:
+                            prd_state["sections"][section] = [content]
+                        updated = True
+                elif isinstance(current_content, dict):
+                    # Convert content to fit dict structure if needed
+                    if isinstance(content, str):
+                        # Add to first empty subsection
+                        for subsection in current_content:
+                            if not current_content[subsection]:
+                                current_content[subsection] = content
+                                updated = True
+                                break
+                else:
+                    # Simple string content
+                    if not current_content or _is_generic_content(current_content):
+                        prd_state["sections"][section] = content
+                        updated = True
+    
+    return updated
+
+def _generate_clean_prd_markdown(prd_state):
+    """Generate clean PRD markdown from state"""
+    project_name = prd_state.get("project_name", "Untitled Project")
+    generated_date = prd_state.get("generated_date", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    
+    markdown = f"""# {project_name} - Product Requirements Document
+
+*Generated on: {generated_date}*
+
+"""
+    
+    # Section title mapping
+    section_titles = {
+        "project_overview": "Project Overview",
+        "objectives": "Objectives", 
+        "user_stories": "User Stories",
+        "functional_requirements": "Functional Requirements",
+        "non_functional_requirements": "Non-Functional Requirements",
+        "technical_specifications": "Technical Specifications",
+        "success_metrics": "Success Metrics",
+        "design_notes": "Design Notes",
+        "next_steps": "Next Steps"
+    }
+    
+    # Subsection title mapping
+    subsection_titles = {
+        "core_functionality": "Core Functionality",
+        "api_requirements": "API Requirements",
+        "integration_capabilities": "Integration Capabilities",
+        "performance_and_scalability": "Performance and Scalability",
+        "security_and_reliability": "Security and Reliability",
+        "user_experience": "User Experience",
+        "database_design": "Database Design",
+        "backend_architecture": "Backend Architecture",
+        "frontend_framework": "Frontend Framework",
+        "key_performance_indicators": "Key Performance Indicators (KPIs)",
+        "business_metrics": "Business Metrics",
+        "ux_considerations": "UX Considerations",
+        "technical_considerations": "Technical Considerations"
+    }
+    
+    sections = prd_state.get("sections", {})
+    
+    for section_key in PRD_SECTIONS:
+        if section_key in sections:
+            section_content = sections[section_key]
+            section_title = section_titles.get(section_key, section_key.replace('_', ' ').title())
+            
+            markdown += f"## {section_title}\n\n"
+            
+            if isinstance(section_content, dict):
+                # Handle sections with subsections
+                has_content = False
+                for subsection_key, subsection_content in section_content.items():
+                    if subsection_content and not _is_generic_content(str(subsection_content)):
+                        has_content = True
+                        subsection_title = subsection_titles.get(subsection_key, subsection_key.replace('_', ' ').title())
+                        markdown += f"### {subsection_title}\n\n"
+                        
+                        if isinstance(subsection_content, list):
+                            for item in subsection_content:
+                                markdown += f"- {item}\n"
+                        else:
+                            markdown += f"{subsection_content}\n"
+                        markdown += "\n"
+                
+                if not has_content:
+                    markdown += "*To be defined based on further analysis*\n\n"
+            elif isinstance(section_content, list):
+                # Handle list sections
+                if section_content:
+                    for item in section_content:
+                        markdown += f"- {item}\n"
+                    markdown += "\n"
+                else:
+                    markdown += "*To be defined based on further analysis*\n\n"
+            else:
+                # Handle text sections
+                if section_content and not _is_generic_content(section_content):
+                    markdown += f"{section_content}\n\n"
+                else:
+                    markdown += "*To be defined based on further analysis*\n\n"
+    
+    return markdown

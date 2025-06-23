@@ -1,5 +1,4 @@
 # tools/format_prd.py
-
 def format_prd_markdown(prd_state: dict) -> str:
     output = ["# 📄 Product Requirements Document\n"]
     for section, items in prd_state.items():
@@ -11,6 +10,11 @@ def format_prd_markdown(prd_state: dict) -> str:
             else:
                 output.append("_(no entries)_")
         else:
-            output.append(str(items))
+            # Handle empty strings or None
+            val = str(items).strip() if items is not None else ""
+            if val:
+                output.append(val)
+            else:
+                output.append("_(no entries)_")
         output.append("")  # spacing
     return "\n".join(output)

@@ -1,5 +1,5 @@
 # Enhanced src/core/user_interface_api.py with debug routes
-
+from datetime import datetime
 import os
 import io
 import asyncio
@@ -42,13 +42,15 @@ def start_debate():
 @api_blueprint.route('/continue_debate', methods=['POST'])
 def continue_debate():
     if not orchestrator.context or "prd_state" not in orchestrator.context:
-        return jsonify({"error": "🛑 Please start the debate first."}), 400
+        return jsonify({"error": "Please start the debate first."}), 400
     
     mention = request.json.get("mention", "")
     print(f"Continuing debate with mention: {mention}")
     
     try:
         result = asyncio.run(orchestrator.run_round(mention))
+        orchestrator.context["prd_state"] = validate_prd_state(orchestrator.context["prd_state"])
+        orchestrator.context["prd_state"] = normalize_prd(orchestrator.context["prd_state"])
         print(f"Round completed. PRD sections filled: {result.get('prd_sections_filled', 'unknown')}")
         return jsonify(result)
     except Exception as e:
@@ -272,3 +274,9 @@ def list_sessions():
     os.makedirs(folder, exist_ok=True)
     sessions = [f.replace(".json", "") for f in os.listdir(folder) if f.endswith(".json")]
     return jsonify({"sessions": sorted(sessions)})
+
+@api_blueprint.route('/debug/clean_prd', methods=['POST'])
+def clean_prd():
+    orchestrator.context["prd_state"] = validate_prd_state(orchestrator.context["prd_state"])
+    orchestrator.context["prd_state"] = normalize_prd(orchestrator.context["prd_state"])
+    return jsonify(orchestrator.context["prd_state"])
