@@ -4,6 +4,8 @@
 ![Hackathon](https://img.shields.io/badge/Purpose-Hackathon-blue)
 
 Your personal AI product team for structured product development through multi-agent debate systems.
+![image](https://github.com/user-attachments/assets/12c15a78-6813-4571-8653-d4e6dc925ab9)
+
 
 ## Table of Contents
 - [Features](#features)
