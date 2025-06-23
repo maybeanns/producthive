@@ -10,3 +10,4 @@ google-generativeai
 vertexai
 # App
 flask
+gunicorn==21.2.0
