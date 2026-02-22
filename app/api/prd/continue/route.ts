@@ -1,46 +1,46 @@
+/**
+ * PRD Continue — V2 Async
+ * POST /api/prd/continue → 202 Accepted + { jobId }
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { PRDOrchestrator } from '@/lib/prd/orchestrator';
-import { getPRDOrchestrator, setPRDOrchestrator } from '@/lib/storage/orchestrators';
+import { enqueueContinueJob } from '@/lib/queue/producers';
+import { getDefaultModelId } from '@/lib/ai/model-registry';
+
+export const maxDuration = 10;
 
 export async function POST(request: NextRequest) {
     try {
-        const { sessionId, userMessage } = await request.json();
+        const body = await request.json();
+        const { jobId, userInput, modelId, userKeys } = body;
 
-        if (!sessionId) {
+        if (!jobId || !userInput) {
             return NextResponse.json(
-                { error: 'Session ID is required' },
+                { error: 'Missing required fields: jobId, userInput' },
                 { status: 400 }
             );
         }
 
-        const orchestrator = getPRDOrchestrator(sessionId);
-
-        if (!orchestrator) {
-            return NextResponse.json(
-                { error: 'Session not found. Please start a new PRD generation.' },
-                { status: 404 }
-            );
-        }
-
-        // Continue the debate
-        const result = await orchestrator.continueDebate(userMessage);
-
-        return NextResponse.json({
-            sessionId,
-            debateRound: {
-                ...result.debateRound,
-                responses: result.debateRound.responses.map(r => ({
-                    ...r,
-                    timestamp: r.timestamp.toISOString(),
-                })),
-            },
-            prdState: result.prdState,
-            filledSections: orchestrator.getFilledSectionsCount(),
+        const newJobId = await enqueueContinueJob({
+            jobId,
+            userInput,
+            modelId: modelId || getDefaultModelId(),
+            userKeys,
         });
-    } catch (error) {
-        console.error('Error continuing PRD debate:', error);
+
         return NextResponse.json(
-            { error: 'Failed to continue PRD generation', details: String(error) },
+            {
+                jobId: newJobId,
+                message: 'Debate continuation started',
+                streamUrl: `/api/jobs/${newJobId}/stream`,
+                statusUrl: `/api/jobs/${newJobId}/status`,
+            },
+            { status: 202 }
+        );
+    } catch (error) {
+        console.error('PRD continue error:', error);
+        return NextResponse.json(
+            { error: 'Failed to continue debate' },
             { status: 500 }
         );
     }

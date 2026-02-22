@@ -1,44 +1,47 @@
+/**
+ * PRD Start — V2 Async
+ * POST /api/prd/start → 202 Accepted + { jobId }
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { PRDOrchestrator } from '@/lib/prd/orchestrator';
-import { setPRDOrchestrator } from '@/lib/storage/orchestrators';
+import { enqueuePRDJob } from '@/lib/queue/producers';
+import { getDefaultModelId } from '@/lib/ai/model-registry';
+
+export const maxDuration = 10;
 
 export async function POST(request: NextRequest) {
     try {
-        const { topic, sessionId, projectType } = await request.json();
+        const body = await request.json();
+        const { topic, projectType, modelId, userKeys, maxRounds } = body;
 
-        if (!topic || typeof topic !== 'string') {
+        if (!topic) {
             return NextResponse.json(
-                { error: 'Project topic is required' },
+                { error: 'Missing required field: topic' },
                 { status: 400 }
             );
         }
 
-        // Create new orchestrator for this session
-        const orchestrator = new PRDOrchestrator();
-        const session = sessionId || `session-${Date.now()}`;
-
-        // Store orchestrator
-        setPRDOrchestrator(session, orchestrator);
-
-        // Start the debate
-        const result = await orchestrator.startDebate(topic, projectType || 'Full Stack App');
-
-        return NextResponse.json({
-            sessionId: session,
-            debateRound: {
-                ...result.debateRound,
-                responses: result.debateRound.responses.map(r => ({
-                    ...r,
-                    timestamp: r.timestamp.toISOString(),
-                })),
-            },
-            prdState: result.prdState,
-            filledSections: orchestrator.getFilledSectionsCount(),
+        const jobId = await enqueuePRDJob({
+            topic,
+            projectType: projectType || 'Full Stack App',
+            modelId: modelId || getDefaultModelId(),
+            userKeys,
+            maxRounds: maxRounds || 3,
         });
-    } catch (error) {
-        console.error('Error starting PRD debate:', error);
+
         return NextResponse.json(
-            { error: 'Failed to start PRD generation', details: String(error) },
+            {
+                jobId,
+                message: 'PRD generation started',
+                streamUrl: `/api/jobs/${jobId}/stream`,
+                statusUrl: `/api/jobs/${jobId}/status`,
+            },
+            { status: 202 }
+        );
+    } catch (error) {
+        console.error('PRD start error:', error);
+        return NextResponse.json(
+            { error: 'Failed to start PRD generation' },
             { status: 500 }
         );
     }

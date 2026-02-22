@@ -147,3 +147,17 @@ export interface CommitInfo {
     author: AgentRole;
     timestamp: Date;
 }
+
+// Jira Integration Types
+export interface JiraTask {
+    id: string;
+    key: string;
+    summary: string;
+    status: string;
+    assignedTo: AgentRole;
+}
+
+export interface JiraIntegration {
+    projectKey: string;
+    tasks: JiraTask[];
+}

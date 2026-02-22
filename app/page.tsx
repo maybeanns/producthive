@@ -5,7 +5,7 @@ import HoneycombBackground from "@/components/landing/HoneycombBackground";
 
 export default function Home() {
     return (
-        <main className="min-h-screen bg-background relative overflow-hidden flex flex-col items-center justify-center">
+        <main className="min-h-screen bg-background relative overflow-x-hidden flex flex-col items-center justify-center">
             {/* Honeycomb Background Pattern */}
             <HoneycombBackground />
 

@@ -1,10 +1,10 @@
 /**
  * Vertex AI Client for Google Cloud AI Platform
  * Handles communication with Gemini models via Vertex AI SDK
- * 
- * Note: This is a simplified client. In production, ensure proper
- * authentication with Google Cloud service account credentials.
  */
+
+import { ChatVertexAI } from "@langchain/google-vertexai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 export interface VertexAIConfig {
     project: string;
@@ -18,45 +18,50 @@ interface Message {
 }
 
 export class VertexAIClient {
+    private model: ChatVertexAI;
     private project: string;
     private location: string;
-    private modelName: string;
-
 
     constructor(config: VertexAIConfig) {
         const { project, location, model = 'gemini-1.5-pro' } = config;
-
         this.project = project;
         this.location = location;
-        this.modelName = model;
+
+        // Initialize LangChain VertexAI model
+        // Credentials are automatically loaded from GOOGLE_APPLICATION_CREDENTIALS env var
+        this.model = new ChatVertexAI({
+            model: model,
+            location: location,
+            temperature: 0.7,
+            maxOutputTokens: 8192,
+        });
     }
 
     /**
      * Generate content from a prompt
-     * 
-     * NOTE: This is a mock implementation for demonstration.
-     * In production, integrate with actual Vertex AI SDK or REST API.
      */
     async generate(prompt: string, systemInstruction?: string): Promise<string> {
         try {
-            // Mock implementation - replace with actual Vertex AI API call
-            console.warn('VertexAIClient.generate() is using mock implementation');
+            const messages = [];
 
-            // In production, you would call Vertex AI REST API here
-            // Example: POST https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict
+            if (systemInstruction) {
+                messages.push(new SystemMessage(systemInstruction));
+            }
 
-            const mockResponse = `As an AI agent, I've analyzed your request: "${prompt.substring(0, 100)}..."
-      
-Based on the requirements, here are my recommendations:
+            messages.push(new HumanMessage(prompt));
 
-1. Initial Assessment: The project requires careful planning and execution
-2. Technical Considerations: Modern architecture with scalability in mind
-3. User Experience: Focus on intuitive, accessible design
-4. Implementation Strategy: Iterative development with continuous feedback
+            const response = await this.model.invoke(messages);
 
-${systemInstruction ? `\nNote: Following system instruction: ${systemInstruction.substring(0, 50)}...` : ''}`;
+            // Handle content type (string or array of content parts)
+            if (typeof response.content === 'string') {
+                return response.content;
+            } else if (Array.isArray(response.content)) {
+                return response.content.map(c =>
+                    typeof c === 'string' ? c : JSON.stringify(c)
+                ).join('');
+            }
 
-            return mockResponse;
+            return String(response.content);
         } catch (error) {
             console.error('Vertex AI generation error:', error);
             throw new Error(`Failed to generate content: ${error}`);
@@ -68,13 +73,25 @@ ${systemInstruction ? `\nNote: Following system instruction: ${systemInstruction
      */
     async chat(messages: Message[], systemInstruction?: string): Promise<string> {
         try {
-            console.warn('VertexAIClient.chat() is using mock implementation');
+            const langchainMessages = [];
 
-            const conversationContext = messages
-                .map(msg => `${msg.role}: ${msg.content}`)
-                .join('\n\n');
+            if (systemInstruction) {
+                langchainMessages.push(new SystemMessage(systemInstruction));
+            }
 
-            return await this.generate(conversationContext, systemInstruction);
+            for (const msg of messages) {
+                if (msg.role === 'user') {
+                    langchainMessages.push(new HumanMessage(msg.content));
+                } else if (msg.role === 'model' || msg.role === 'assistant') {
+                    langchainMessages.push(new SystemMessage(msg.content)); // Using SystemMessage for assistant context or AIMessage if imported
+                }
+            }
+
+            const response = await this.model.invoke(langchainMessages);
+            if (typeof response.content === 'string') {
+                return response.content;
+            }
+            return String(response.content);
         } catch (error) {
             console.error('Vertex AI chat error:', error);
             throw new Error(`Failed to chat: ${error}`);
@@ -83,32 +100,21 @@ ${systemInstruction ? `\nNote: Following system instruction: ${systemInstruction
 
     /**
      * Generate structured JSON output
+     * Note: Full structured output enforcement depends on model capability.
+     * For now, we prompt for JSON.
      */
     async generateJSON<T>(prompt: string, systemInstruction?: string): Promise<T> {
-        console.warn('VertexAIClient.generateJSON() is using mock implementation');
+        const jsonPrompt = `${prompt}\n\nIMPORTANT: Return ONLY valid JSON properly formatted. Do not include markdown code blocks like \`\`\`json.`;
 
-        // Mock JSON response based on the prompt
-        const mockData: any = {
-            tasks: [
-                'Set up project structure',
-                'Implement core features',
-                'Add authentication',
-                'Deploy to production',
-            ],
-            architecture: 'Modular architecture with clear separation of concerns',
-            techStack: {
-                frontend: 'Next.js + TypeScript',
-                backend: 'Node.js API',
-                database: 'PostgreSQL',
-            },
-            fileStructure: {
-                '/app': ['page.tsx', 'layout.tsx'],
-                '/components': ['Header.tsx', 'Footer.tsx'],
-                '/lib': ['utils.ts', 'api.ts'],
-            },
-        };
-
-        return mockData as T;
+        try {
+            const result = await this.generate(jsonPrompt, systemInstruction);
+            // Clean up if markdown blocks are included despite instructions
+            const cleanResult = result.replace(/```json/g, '').replace(/```/g, '').trim();
+            return JSON.parse(cleanResult) as T;
+        } catch (error) {
+            console.error('Vertex AI JSON generation error:', error);
+            throw error;
+        }
     }
 }
 
@@ -120,11 +126,19 @@ let vertexClient: VertexAIClient | null = null;
  */
 export function getVertexAIClient(): VertexAIClient {
     if (!vertexClient) {
-        const project = process.env.GOOGLE_CLOUD_PROJECT_ID || 'demo-project';
+        const project = process.env.GOOGLE_CLOUD_PROJECT_ID;
         const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
         const model = process.env.VERTEX_AI_MODEL || 'gemini-1.5-pro';
 
-        vertexClient = new VertexAIClient({ project, location, model });
+        if (!project) {
+            console.warn('GOOGLE_CLOUD_PROJECT_ID is not set in environment variables.');
+        }
+
+        vertexClient = new VertexAIClient({
+            project: project || 'undefined-project',
+            location,
+            model
+        });
     }
 
     return vertexClient;

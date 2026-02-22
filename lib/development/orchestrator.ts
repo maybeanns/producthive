@@ -12,6 +12,8 @@ import type {
 } from '@/lib/types/agent-types';
 import { developmentAgents, getAgentByRole } from '@/lib/agents/agent-config';
 import { getVertexAIClient } from '@/lib/ai/vertex-client';
+import { JiraClient } from '@/lib/jira/client';
+import { GitHubClient } from '@/lib/github/mcp-client';
 
 export class DevelopmentOrchestrator {
     private agents: Agent[];
@@ -38,11 +40,64 @@ export class DevelopmentOrchestrator {
     }
 
     /**
+     * Execute full end-to-end workflow: Planning -> Jira -> GitHub -> Code -> Test -> Push
+     */
+    async executeFullWorkflow(jiraClient: JiraClient, githubClient: GitHubClient): Promise<{
+        repoUrl: string;
+        jiraProjectUrl: string;
+        taskCount: number;
+    }> {
+        // 1. Planning
+        const plan = await this.planDevelopmentInternal();
+
+        // 2. Jira Breakdown
+        const jiraIssues = await this.syncTasksToJira(jiraClient, plan.tasks);
+
+        // 3. GitHub Initialization
+        const repoUrl = await githubClient.createRepository(this.prdState.projectName || 'producthive-app', false);
+
+        // 4. Code Generation & Local Storage
+        const filesToGenerate = this.flattenFileStructure(plan.fileStructure);
+        for (const [path, description] of Object.entries(filesToGenerate)) {
+            await this.generateCode(path, description);
+        }
+
+        // 5. Testing
+        const testResults = await this.runTests();
+
+        // 6. Push to GitHub
+        await githubClient.commitFiles(
+            this.developmentState.files.map(f => ({ path: f.path, content: f.content })),
+            `Initial build based on PRD: ${this.prdState.projectName}`,
+            'main'
+        );
+
+        return {
+            repoUrl,
+            jiraProjectUrl: `${jiraClient.host}/browse/${jiraClient.projectKey}`,
+            taskCount: jiraIssues.length,
+        };
+    }
+
+    /**
      * Phase 1: Planning - Break down PRD into actionable tasks
      */
     async planDevelopment(): Promise<{
         tasks: string[];
         architecture: string;
+    }> {
+        const plan = await this.planDevelopmentInternal();
+        return {
+            tasks: plan.tasks,
+            architecture: plan.architecture
+        };
+    }
+
+    private async planDevelopmentInternal(): Promise<{
+        tasks: string[];
+        architecture: string;
+        techStack: Record<string, string>;
+        fileStructure: Record<string, string>;
     }> {
         const planningAgent = getAgentByRole('planning');
         if (!planningAgent) throw new Error('Planning agent not found');
@@ -57,14 +112,18 @@ Provide:
 1. List of development tasks in priority order
 2. High-level architecture overview
 3. Suggested tech stack
-4. File structure
+4. File structure (mapping file paths to brief functional descriptions)
 
 Format as JSON:
 {
   "tasks": ["task 1", "task 2", ...],
   "architecture": "architecture description",
   "techStack": {...},
-  "fileStructure": {...}
+  "fileStructure": {
+    "src/app/page.tsx": "Main landing page component...",
+    "src/lib/utils.ts": "Utility functions for...",
+    ...
+  }
 }`;
 
         try {
@@ -72,20 +131,41 @@ Format as JSON:
                 tasks: string[];
                 architecture: string;
                 techStack: Record<string, string>;
-                fileStructure: Record<string, string[]>;
+                fileStructure: Record<string, string>;
             }>(prompt, planningAgent.systemPrompt);
 
             this.developmentState.pendingTasks = response.tasks;
             this.developmentState.currentPhase = 'implementation';
 
-            return {
-                tasks: response.tasks,
-                architecture: response.architecture,
-            };
+            return response;
         } catch (error) {
             console.error('Error planning development:', error);
             throw error;
         }
+    }
+
+    /**
+     * Breakdown tasks into Jira
+     */
+    private async syncTasksToJira(jiraClient: JiraClient, tasks: string[]) {
+        const issues = tasks.map(task => ({
+            summary: task,
+            description: `Generated development task for ${this.prdState.projectName}`,
+            issuetype: { name: 'Task' }
+        }));
+
+        return await jiraClient.createIssues(issues);
+    }
+
+    /**
+     * Flatten file structure map
+     */
+    private flattenFileStructure(structure: any): Record<string, string> {
+        // AI might return different formats, we try to normalize to Record<string, string>
+        if (typeof structure === 'object' && !Array.isArray(structure)) {
+            return structure as Record<string, string>;
+        }
+        return {};
     }
 
     /**

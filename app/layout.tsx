@@ -20,6 +20,8 @@ export const metadata: Metadata = {
     keywords: ["AI", "software development", "PRD", "automation", "multi-agent"],
 };
 
+import Navbar from "@/components/landing/Navbar";
+
 export default function RootLayout({
     children,
 }: {
@@ -28,7 +30,7 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <body className={`${outfit.variable} ${dmSans.variable} font-sans antialiased`} suppressHydrationWarning>
-                {/* Suppress hydration warning for browser extensions */}
+                <Navbar />
                 {children}
             </body>
         </html>
