@@ -23,18 +23,42 @@ interface ModelOption {
     costTier: string;
 }
 
-const PROVIDER_ICONS: Record<string, string> = {
-    groq: '🦙',
-    vertex: '✦',
-    openai: '◆',
-    anthropic: '✴',
+const MODEL_ICONS: Record<string, string> = {
+    gemini: '/model_icons/gemini.png',
+    llama: '/model_icons/meta for llama.png',
+    gpt: '/model_icons/ChatGPT.png',
+    claude: '/model_icons/claude.svg',
+    kimi: '/model_icons/kimi.png',
+    qwen: '/model_icons/Qwen_logo.svg.png', // Fallback for groq models without specific icon
 };
-const PROVIDER_COLORS: Record<string, string> = {
-    groq: 'bg-orange-500/15 text-orange-400 border border-orange-500/20',
-    vertex: 'bg-blue-500/15 text-blue-400 border border-blue-500/20',
-    openai: 'bg-green-500/15 text-green-400 border border-green-500/20',
-    anthropic: 'bg-purple-500/15 text-purple-400 border border-purple-500/20',
-};
+
+function ModelIcon({ model, className = "w-4 h-4" }: { model?: ModelOption | null, className?: string }) {
+    if (!model) return <div className={`${className} bg-muted rounded-full`} />;
+
+    const id = model.id.toLowerCase();
+    const name = model.name.toLowerCase();
+
+    let src = '';
+    if (id.includes('gemini') || name.includes('gemini')) src = MODEL_ICONS.gemini;
+    else if (id.includes('llama') || name.includes('llama')) src = MODEL_ICONS.llama;
+    else if (id.includes('gpt') || name.includes('gpt')) src = MODEL_ICONS.gpt;
+    else if (id.includes('claude') || name.includes('anthropic') || name.includes('claude')) src = MODEL_ICONS.claude;
+    else if (id.includes('kimi') || name.includes('kimi')) src = MODEL_ICONS.kimi;
+    else if (id.includes('qwen') || name.includes('qwen')) src = MODEL_ICONS.qwen;
+
+    if (!src) return <div className={`${className} bg-primary/20 rounded-full flex items-center justify-center text-[10px] font-bold`}>{model.name[0]}</div>;
+
+    return (
+        <img
+            src={src}
+            alt={model.name}
+            className={`${className} object-contain`}
+            onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+            }}
+        />
+    );
+}
 
 // ── SettingsContent (inline, no separate file needed for layout) ──────────────
 
@@ -77,8 +101,8 @@ function SettingsContent({
             <button
                 onClick={onSave}
                 className={`w-full py-2 rounded-xl text-xs font-semibold transition-all ${saved
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-foreground text-background hover:opacity-90'
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-foreground text-background hover:opacity-90'
                     }`}
             >
                 {saved ? '✓ Saved' : 'Save Settings'}
@@ -347,11 +371,9 @@ export default function MainInput() {
                                         : 'bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted'
                                     }`}
                             >
-                                <span className="text-base leading-none">
-                                    {PROVIDER_ICONS[selectedModel?.provider ?? ''] ?? '●'}
-                                </span>
-                                <span>{selectedModel?.name ?? 'Select model'}</span>
-                                <ChevronDown className={`w-3 h-3 opacity-60 transition-transform ${showModels ? 'rotate-180' : ''}`} />
+                                <ModelIcon model={selectedModel} className="w-4 h-4" />
+                                <span className="truncate">{selectedModel?.name ?? 'Select model'}</span>
+                                <ChevronDown className={`w-3 h-3 opacity-60 flex-shrink-0 transition-transform ${showModels ? 'rotate-180' : ''}`} />
                             </button>
                         </div>
 
@@ -426,12 +448,9 @@ export default function MainInput() {
                                             ? 'bg-primary/10 text-foreground'
                                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                                 >
-                                    <span className="text-base leading-none flex-shrink-0">{PROVIDER_ICONS[m.provider] ?? '●'}</span>
+                                    <ModelIcon model={m} className="w-5 h-5" />
                                     <span className="flex-1 min-w-0">
                                         <span className="block font-medium truncate">{m.name}</span>
-                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] mt-0.5 ${PROVIDER_COLORS[m.provider] ?? 'bg-muted text-muted-foreground'}`}>
-                                            {m.provider}
-                                        </span>
                                     </span>
                                     {selectedModel?.id === m.id && <Check className="w-3 h-3 text-primary flex-shrink-0" />}
                                 </button>
