@@ -216,10 +216,10 @@ export default function ThinkingCanvas({ jobId }: ThinkingCanvasProps) {
                                     animate={{ x: 0, opacity: 1 }}
                                     transition={{ delay: index * 0.05 }}
                                     className={`flex items-center gap-4 p-3 rounded-xl border transition-all duration-500 ${isActive
-                                            ? 'bg-card border-border shadow-lg shadow-blue-500/5'
-                                            : isCompleted
-                                                ? 'bg-transparent border-transparent opacity-60'
-                                                : 'bg-transparent border-transparent opacity-20'
+                                        ? 'bg-card border-border shadow-lg shadow-blue-500/5'
+                                        : isCompleted
+                                            ? 'bg-transparent border-transparent opacity-60'
+                                            : 'bg-transparent border-transparent opacity-20'
                                         }`}
                                 >
                                     <div className={`
@@ -249,35 +249,42 @@ export default function ThinkingCanvas({ jobId }: ThinkingCanvasProps) {
                             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                 Agent Debate
                             </h3>
-                            {agentMessages.slice(-6).map((msg, i) => (
-                                <motion.div
-                                    key={i}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="flex items-start gap-3 p-3 bg-card rounded-xl border border-border/50"
-                                >
-                                    <div
-                                        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
-                                        style={{ backgroundColor: msg.color || '#6366F1' }}
+                            {agentMessages.slice(-6).map((msg, i) => {
+                                const agentName = msg.agent || msg.agentName || msg.data?.agentName || 'Agent';
+                                const summary = msg.summary || msg.message || msg.data?.reasoning || msg.data?.summary || 'Analyzing...';
+                                const color = msg.color || msg.data?.agentColor || '#6366F1';
+                                const round = msg.round || msg.data?.round || 0;
+
+                                return (
+                                    <motion.div
+                                        key={i}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex items-start gap-3 p-3 bg-card rounded-xl border border-border/50"
                                     >
-                                        {(msg.agent || '?')[0]}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-medium text-foreground">{msg.agent}</span>
-                                            <span className="text-[10px] text-muted-foreground">Round {msg.round}</span>
-                                            {msg.usedFallback && (
-                                                <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded">
-                                                    fallback
-                                                </span>
-                                            )}
+                                        <div
+                                            className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white shadow-sm"
+                                            style={{ backgroundColor: color }}
+                                        >
+                                            {agentName[0]}
                                         </div>
-                                        <p className="text-xs text-muted-foreground mt-1 line-clamp-3">
-                                            {msg.summary || 'Analyzing...'}
-                                        </p>
-                                    </div>
-                                </motion.div>
-                            ))}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-semibold text-foreground">{agentName}</span>
+                                                <span className="text-[10px] text-muted-foreground/60 px-1.5 py-0.5 bg-muted rounded">Round {round}</span>
+                                                {(msg.usedFallback || msg.data?.usedFallback) && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded font-medium">
+                                                        fallback
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1.5 line-clamp-3 leading-relaxed">
+                                                {summary}
+                                            </p>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

@@ -45,12 +45,14 @@ export default function Navbar() {
                 transition={{ duration: 0.4, ease: 'easeOut' }}
                 className="relative pointer-events-auto"
             >
-                <div className="relative bg-[#C2611A] px-5 py-2.5 rounded-b-[20px] flex items-center gap-2 text-white">
-                    <ConcaveLeft color="#C2611A" />
-                    <ConcaveRight color="#C2611A" />
+                <div className="relative bg-[#DD830A] px-5 py-2.5 rounded-b-[20px] flex items-center gap-2 text-white">
+                    <ConcaveLeft color="#DD830A" />
+                    <ConcaveRight color="#DD830A" />
 
-                    <Hexagon className="w-4 h-4 fill-white/20 flex-shrink-0" strokeWidth={2.5} />
-                    <span className="font-display font-semibold tracking-tight text-sm whitespace-nowrap">ProductHive</span>
+                    <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+                        <Hexagon className="w-4 h-4 fill-white/20 flex-shrink-0" strokeWidth={2.5} />
+                        <span className="font-display font-semibold tracking-tight text-sm whitespace-nowrap">ProductHive</span>
+                    </Link>
                 </div>
             </motion.div>
 

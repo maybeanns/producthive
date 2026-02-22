@@ -21,13 +21,31 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const jobId = await enqueuePRDJob({
-            topic,
-            projectType: projectType || 'Full Stack App',
-            modelId: modelId || getDefaultModelId(),
-            userKeys,
-            maxRounds: maxRounds || 3,
-        });
+        let jobId: string;
+        try {
+            jobId = await enqueuePRDJob({
+                topic,
+                projectType: projectType || 'Full Stack App',
+                modelId: modelId || getDefaultModelId(),
+                userKeys,
+                maxRounds: maxRounds || 3,
+            });
+        } catch (error) {
+            console.warn('[Queue] Redis unavailable, falling back to inline execution');
+            jobId = `prd-inline-${Date.now()}`;
+
+            // Execute in background
+            import('@/lib/prd/runner').then(({ runPRDGeneration }) => {
+                runPRDGeneration({
+                    jobId,
+                    topic,
+                    projectType: projectType || 'Full Stack App',
+                    modelId: modelId || getDefaultModelId(),
+                    userKeys,
+                    maxRounds: maxRounds || 3,
+                }).catch(err => console.error('[InlineRunner] Failed:', err));
+            });
+        }
 
         return NextResponse.json(
             {

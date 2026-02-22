@@ -105,7 +105,17 @@ export async function enqueueContinueJob(data: ContinueJobData): Promise<string>
 }
 
 /**
- * Get job status from a queue
+ * In-memory job status tracker for local fallback
+ */
+const inlineJobs = new Map<string, { status: string; progress: number; result?: any; error?: string }>();
+
+export function updateInlineJob(jobId: string, update: Partial<{ status: string; progress: number; result?: any; error?: string }>) {
+    const existing = inlineJobs.get(jobId) || { status: 'active', progress: 0 };
+    inlineJobs.set(jobId, { ...existing, ...update });
+}
+
+/**
+ * Get job status from a queue or inline storage
  */
 export async function getJobStatus(jobId: string): Promise<{
     status: string;
@@ -113,21 +123,31 @@ export async function getJobStatus(jobId: string): Promise<{
     result?: any;
     error?: string;
 } | null> {
-    const prd = getPRDQueue();
-    let job = await prd.getJob(jobId);
-
-    if (!job) {
-        const build = getBuildQueue();
-        job = await build.getJob(jobId);
+    // 1. Check inline jobs first
+    if (inlineJobs.has(jobId)) {
+        return inlineJobs.get(jobId)!;
     }
 
-    if (!job) return null;
+    // 2. Fallback to BullMQ
+    try {
+        const prd = getPRDQueue();
+        let job = await prd.getJob(jobId);
 
-    const state = await job.getState();
-    return {
-        status: state,
-        progress: typeof job.progress === 'number' ? job.progress : 0,
-        result: job.returnvalue,
-        error: job.failedReason,
-    };
+        if (!job) {
+            const build = getBuildQueue();
+            job = await build.getJob(jobId);
+        }
+
+        if (!job) return null;
+
+        const state = await job.getState();
+        return {
+            status: state,
+            progress: typeof job.progress === 'number' ? job.progress : 0,
+            result: job.returnvalue,
+            error: job.failedReason,
+        };
+    } catch {
+        return null;
+    }
 }

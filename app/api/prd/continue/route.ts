@@ -21,12 +21,29 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const newJobId = await enqueueContinueJob({
-            jobId,
-            userInput,
-            modelId: modelId || getDefaultModelId(),
-            userKeys,
-        });
+        let newJobId: string;
+        try {
+            newJobId = await enqueueContinueJob({
+                jobId,
+                userInput,
+                modelId: modelId || getDefaultModelId(),
+                userKeys,
+            });
+        } catch (error) {
+            console.warn('[Queue] Redis unavailable for continue, falling back to inline');
+            newJobId = `continue-inline-${Date.now()}`;
+
+            // Execute in background
+            import('@/lib/prd/runner').then(({ runPRDGeneration }) => {
+                runPRDGeneration({
+                    jobId: newJobId,
+                    topic: userInput, // Using user input as the "topic" to continue
+                    projectType: 'Continuation', // Flagging as continuation
+                    modelId: modelId || getDefaultModelId(),
+                    userKeys,
+                }).catch(err => console.error('[InlineContinue] Failed:', err));
+            });
+        }
 
         return NextResponse.json(
             {

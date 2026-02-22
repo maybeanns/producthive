@@ -13,20 +13,23 @@ function WorkspaceContent() {
     const modelId = searchParams.get('model') || undefined;
 
     return (
-        <div className="flex h-screen bg-background overflow-hidden">
-            {/* Left Pane - Chat & Inputs */}
-            <div className="w-[400px] flex-shrink-0 h-full relative z-20 shadow-2xl">
-                <WorkspaceChat
-                    initialInput={q}
-                    initialType={type}
-                    jobId={jobId}
-                    modelId={modelId}
-                />
-            </div>
+        <div className="flex flex-col h-screen bg-background">
+            {/* Main Workspace Area below fixed navbar */}
+            <div className="flex flex-1 mt-14 overflow-hidden">
+                {/* Left Pane - Chat & Inputs */}
+                <div className="w-[400px] flex-shrink-0 h-full relative z-20 shadow-2xl border-r border-border/50 bg-card">
+                    <WorkspaceChat
+                        initialInput={q}
+                        initialType={type}
+                        jobId={jobId}
+                        modelId={modelId}
+                    />
+                </div>
 
-            {/* Right Pane - Thinking & Result */}
-            <div className="flex-1 h-full relative z-10">
-                <ThinkingCanvas jobId={jobId} />
+                {/* Right Pane - Thinking & Result */}
+                <div className="flex-1 h-full relative z-10 overflow-hidden">
+                    <ThinkingCanvas jobId={jobId} />
+                </div>
             </div>
         </div>
     );

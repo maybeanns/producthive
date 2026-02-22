@@ -26,8 +26,12 @@ export interface JobEvent {
     data: Record<string, any>;
 }
 
+// ─── Memory Fallback ────────────────────────────────────────────────────────
+// Used when Redis is unavailable (local dev without Docker)
+const memoryEmitters = new Map<string, Set<(event: JobEvent) => void>>();
+
 /**
- * Emit a job event via Redis Pub/Sub
+ * Emit a job event via Redis Pub/Sub with Memory Fallback
  */
 export async function emitJobEvent(jobId: string, type: JobEventType, data: Record<string, any>): Promise<void> {
     const event: JobEvent = {
@@ -37,8 +41,22 @@ export async function emitJobEvent(jobId: string, type: JobEventType, data: Reco
         data,
     };
 
-    const redis = getRedisConnection();
-    await redis.publish(`job:${jobId}`, JSON.stringify(event));
+    // 1. Memory Fallback (Immediate local delivery)
+    const listeners = memoryEmitters.get(jobId);
+    if (listeners) {
+        listeners.forEach(cb => cb(event));
+    }
+
+    // 2. Redis Delivery (Async)
+    try {
+        const redis = getRedisConnection();
+        // Check if redis is actually connected to avoid blocking
+        if (redis.status === 'ready' || redis.status === 'connecting') {
+            await redis.publish(`job:${jobId}`, JSON.stringify(event));
+        }
+    } catch (error) {
+        // Silently fail Redis - memory fallback already handled local needs
+    }
 }
 
 /**
@@ -48,25 +66,48 @@ export function subscribeToJob(
     jobId: string,
     callback: (event: JobEvent) => void
 ): () => void {
-    const subscriber = getSubscriberConnection();
-    const channel = `job:${jobId}`;
+    // 1. Memory Subscription
+    if (!memoryEmitters.has(jobId)) {
+        memoryEmitters.set(jobId, new Set());
+    }
+    memoryEmitters.get(jobId)!.add(callback);
 
-    const handler = (_channel: string, message: string) => {
-        try {
-            const event = JSON.parse(message) as JobEvent;
-            callback(event);
-        } catch (error) {
-            console.error('[EventEmitter] Failed to parse event:', error);
+    // 2. Redis Subscription (Attempt)
+    let redisUnsubscribe = () => { };
+    try {
+        const subscriber = getSubscriberConnection();
+        const channel = `job:${jobId}`;
+
+        const handler = (_channel: string, message: string) => {
+            try {
+                const event = JSON.parse(message) as JobEvent;
+                // Avoid double-delivery if memory already handled it
+                // (Though memory is only for local-process events, Redis is for worker-process events)
+                callback(event);
+            } catch (error) {
+                console.error('[EventEmitter] Failed to parse event:', error);
+            }
+        };
+
+        if (subscriber.status === 'ready' || subscriber.status === 'connecting') {
+            subscriber.subscribe(channel);
+            subscriber.on('message', handler);
+            redisUnsubscribe = () => {
+                subscriber.unsubscribe(channel);
+                subscriber.removeListener('message', handler);
+            };
         }
-    };
+    } catch {
+        // Ignore redis subscription errors
+    }
 
-    subscriber.subscribe(channel);
-    subscriber.on('message', handler);
-
-    // Return unsubscribe function
+    // Return union unsubscribe function
     return () => {
-        subscriber.unsubscribe(channel);
-        subscriber.removeListener('message', handler);
+        memoryEmitters.get(jobId)?.delete(callback);
+        if (memoryEmitters.get(jobId)?.size === 0) {
+            memoryEmitters.delete(jobId);
+        }
+        redisUnsubscribe();
     };
 }
 

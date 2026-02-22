@@ -4,241 +4,81 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![AI Powered](https://img.shields.io/badge/AI-Powered-green)
+![Event Driven](https://img.shields.io/badge/Architecture-Event--Driven-orange)
 
-**Where ideas become reality** - Professional multi-agent software creation platform with PRD generation and GitHub automation.
+**Where ideas become reality** - Professional multi-agent software creation platform with real-time PRD debate, automated development, and GitHub integration.
 
-![ProductHive Landing](https://github.com/user-attachments/assets/12c15a78-6813-4571-8653-d4e6dc925ab9)
+## 🌟 Key Features
 
-## 🌟 Features
+### 🧠 Multi-Agent Debate Engine
+ProductHive features a unique **asynchronous debate engine** where expert agents brainstorm and challenge each other to build the perfect PRD.
+- **Expert Agents**: Planning, UX, Backend, Frontend, Database, and Business analysts.
+- **Real-time Thinking**: Watch agents' "internal monologue" through the Thinking Canvas via SSE.
+- **Dynamic Consensus**: Automated synthesis of debate transcripts into structured architectures.
+- **Human-in-the-Loop**: join the debate! Ask questions or request revisions mid-process.
 
-### Multi-Agent System
-ProductHive uses a unified team of AI agents that work together throughout the entire product lifecycle:
+### 🎭 Specialized Workspace
+- **Thinking Canvas**: A logic-heavy visualization of the agent pipeline, showing active phases, progress, and live debate records.
+- **Collaborative Chat**: Persistent interaction with your agent team throughout the project lifecycle.
 
-- **Planning Agent** - Strategic planning and task breakdown
-- **UX Agent** - User experience design and UI implementation
-- **Backend Agent** - Server-side architecture and APIs  
-- **Frontend Agent** - Client-side development and React components
-- **Database Agent** - Data modeling and database optimization
-- **Business Agent** - Business analysis and requirements validation
-- **Testing Agent** - Quality assurance and automated testing
-- **Deployment Agent** - Infrastructure and CI/CD setup
-
-### Key Capabilities
-
-✨ **PRD Generation** - Collaborative debate between expert agents creates comprehensive Product Requirement Documents
-
-🚀 **Automated Development** - The same agents that created the PRD build the software, ensuring perfect alignment
-
-🧪 **Intelligent Testing** - Testing agent validates implementations against PRD requirements
-
-📦 **GitHub Automation** - Automated Git workflows with commits, branches, and pull requests
-
-☁️ **Smart Deployment** - Deployment agent handles infrastructure and production setup
-
-## 🏗️ Architecture
-
-The platform follows a **unified agent architecture** where agents participate in BOTH PRD generation AND software development phases. This ensures:
-
-- Complete product knowledge continuity from planning to implementation
-- Faster development with context-aware code generation
-- Alignment between requirements and implementation
-- Efficient collaboration between specialized agents
+### 🔌 Resilient Architecture
+- **Queue-First Design**: Powered by BullMQ and Redis for robust background task handling.
+- **Zero-Config Fallback**: Automatically switches to **In-Memory Execution** if Redis is unavailable, ensuring a seamless local development experience.
+- **Custom Model Registry**: Support for Gemini, Llama (Groq), GPT-4o, Claude, and Kimi with branded UI integration.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
 - Node.js 18+
-- Google Cloud Project with Vertex AI enabled
-- GitHub Personal Access Token (for GitHub automation)
-- Google Cloud Service Account with Vertex AI permissions
+- API keys for your preferred models (Google Cloud, Groq, OpenAI, or Anthropic)
+- Redis / Docker (Optional - app will fallback to memory mode)
 
 ### Installation
-
 ```bash
-# Clone the repository
 git clone https://github.com/maybeanns/producthive.git
 cd producthive
-
-# Install dependencies
 npm install
-
-# Set up environment variables
 cp .env.example .env
-# Edit .env with your credentials
-```
-
-### Environment Variables
-
-```bash
-# Google Cloud AI Platform
-GOOGLE_CLOUD_PROJECT_ID=your-project-id
-GOOGLE_CLOUD_LOCATION=us-central1
-VERTEX_AI_MODEL=gemini-1.5-pro
-GOOGLE_APPLICATION_CREDENTIALS=./path-to-service-account.json
-
-# GitHub Integration
-GITHUB_TOKEN=your-github-token
-GITHUB_ORG=your-github-username
-
-# Next.js
-NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ### Development
-
 ```bash
-# Start development server
 npm run dev
-
-# Open http://localhost:3000
+# App will start at http://localhost:3000
 ```
 
-### Build for Production
-
-```bash
-npm run build
-npm start
-```
-
-## 📖 Usage
-
-### 1. Create a Project
-
-Enter your project idea on the landing page:
-```
-Build me an e-commerce platform with user authentication, 
-product catalog, shopping cart, and payment integration.
-```
-
-### 2. PRD Generation
-
-The multi-agent system debates and creates a comprehensive PRD:
-- Planning Agent breaks down requirements
-- UX Agent defines user flows
-- Backend Agent proposes API architecture
-- Frontend Agent suggests UI components
-- Database Agent designs data models
-- Business Agent validates business value
-
-### 3. Software Development
-
-The same agents transition to development:
-- **Planning Phase**: Task breakdown and sprint planning
-- **Implementation Phase**: Code generation for all components
-- **Testing Phase**: Automated testing and bug detection
-- **Deployment Phase**: Infrastructure setup and deployment
-
-### 4. GitHub Integration
-
-Automated Git workflow:
-- Repository initialization
-- Feature branch creation
-- Automated commits during development
-- Pull request generation with descriptions
-- Issue tracking for bugs and features
-
-## 🛠️ API Routes
+## 🛠️ Core API Workflow
 
 ### PRD Generation
-
-```typescript
-// Start PRD debate
-POST /api/prd/start
-Body: { topic: string }
-
-// Continue PRD debate
-POST /api/prd/continue
-Body: { sessionId: string, userMessage?: string }
-
-// Get PRD state
-GET /api/prd/state?sessionId=xxx
-```
-
-### Development
-
-```typescript
-// Plan development
-POST /api/development/plan
-Body: { sessionId: string, prdState: PRDState }
-
-// Generate code
-POST /api/development/generate
-Body: { sessionId: string, filePath: string, description: string }
-
-// Run tests
-POST /api/development/test
-Body: { sessionId: string }
-```
-
-### GitHub
-
-```typescript
-// Initialize repository
-POST /api/github/init
-Body: { repoName: string, isPrivate: boolean }
-
-// Commit files
-POST /api/github/commit
-Body: { files: CodeFile[], message: string, branch: string }
-
-// Create pull request
-POST /api/github/pr
-Body: { title: string, body: string, headBranch: string }
-```
+1. **Start**: `POST /api/prd/start` - Enqueues a new debate job.
+2. **Stream**: `GET /api/jobs/[jobId]/stream` - SSE endpoint for real-time event tracking.
+3. **Continue**: `POST /api/prd/continue` - Enqueues a continuation job with user feedback.
 
 ## 🎨 Technology Stack
 
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS with glassmorphism effects
-- **AI**: Google Vertex AI (Gemini 1.5 Pro)
+- **Framework**: Next.js 15 (App Router), React 19
+- **Orchestration**: BullMQ, ioredis, Custom Memory Pub-Sub
+- **AI**: Gemini 1.5 Pro, Llama 3.1, GPT-4o, Claude 3.5
 - **Animations**: Framer Motion
-- **GitHub**: Octokit (GitHub REST API)
-- **Document Generation**: docx, jspdf
+- **UI**: Tailwind CSS, Lucide Icons, Glassmorphism design system
 
 ## 📁 Project Structure
 
 ```
 producthive/
-├── app/                      # Next.js app directory
-│   ├── api/                  # API routes
-│   │   ├── prd/             # PRD generation endpoints
-│   │   ├── development/     # Development endpoints
-│   │   └── github/          # GitHub automation endpoints
-│   ├── page.tsx             # Landing page
-│   └── layout.tsx           # Root layout
-├── components/              # React components
-│   └── landing/             # Landing page components
-├── lib/                     # Core library code
-│   ├── agents/              # Agent configurations
-│   ├── ai/                  # AI client (Vertex AI)
-│   ├── prd/                 # PRD orchestrator
-│   ├── development/         # Development orchestrator
-│   ├── github/              # GitHub MCP client
-│   └── types/               # TypeScript types
-├── legacy/                  # Original Python implementation
-└── public/                  # Static assets
+├── app/                  # App routes (api, workspace, landing)
+├── components/           # React components (landing, workspace)
+├── lib/                  
+│   ├── agents/           # Expert agent personas
+│   ├── orchestration/    # Debate & Consensus logic
+│   ├── events/           # Event streaming system
+│   ├── ai/               # Multi-provider registry
+│   └── queue/            # Job queueing (Redis + Fallback)
+└── public/               # Branded assets & model icons
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🙏 Acknowledgments
-
-- Google Vertex AI for powerful AI capabilities
-- Next.js team for the excellent framework
-- All contributors and supporters
-
-## 📞 Support
-
-For questions or support, please open an issue on GitHub.
+MIT License.
 
 ---
-
-**Built with ❤️ using ProductHive's own multi-agent system**
+**Built with ❤️ by the ProductHive Agent Team**
