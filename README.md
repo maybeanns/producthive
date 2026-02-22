@@ -8,7 +8,13 @@
 
 **Where ideas become reality** - Professional multi-agent software creation platform with real-time PRD debate, automated development, and GitHub integration.
 
+<<<<<<< HEAD
 ## 🌟 Key Features
+=======
+![ProductHive Landing](https://github.com/user-attachments/assets/12c15a78-6813-4571-8653-d4e6dc925ab9)
+### New Interface
+<img width="1341" height="643" alt="image" src="https://github.com/user-attachments/assets/36d5048a-f64e-4cdc-aa7b-a83ed53942ef" />
+>>>>>>> 172bb6ece94098955594b321fb7891fb9249e10a
 
 ### 🧠 Multi-Agent Debate Engine
 ProductHive features a unique **asynchronous debate engine** where expert agents brainstorm and challenge each other to build the perfect PRD.
